@@ -18554,6 +18554,7 @@ void CPhysicalGeometry::SetSensitivity(CConfig *config) {
   bool sa = (config->GetKind_Turb_Model() == SA) || (config->GetKind_Turb_Model() == SA_NEG);
   bool grid_movement = config->GetGrid_Movement();
   bool frozen_visc = config->GetFrozen_Visc_Disc();
+  bool fem = (config->GetKind_Solver() == FEM_ELASTICITY) || (config->GetKind_Solver() == DISC_ADJ_FEM);
   su2double Sens, dull_val, AoASens;
   unsigned short nExtIter, iDim;
   unsigned long iPoint, index;
@@ -18573,11 +18574,16 @@ void CPhysicalGeometry::SetSensitivity(CConfig *config) {
   
   unsigned short skipVar = nDim, skipMult = 1;
 
-  if (incompressible)      { skipVar += skipMult*(nDim+2); }
-  if (compressible)        { skipVar += skipMult*(nDim+2); }
-  if (sst && !frozen_visc) { skipVar += skipMult*2;}
-  if (sa && !frozen_visc)  { skipVar += skipMult*1;}
-  if (grid_movement)       { skipVar += nDim;}
+  if (fem) {
+    skipVar = 2*nDim;
+  } else {
+    if (incompressible)      { skipVar += skipMult*(nDim+2); }
+    if (compressible)        { skipVar += skipMult*(nDim+2); }
+    if (sst && !frozen_visc) { skipVar += skipMult*2;}
+    if (sa && !frozen_visc)  { skipVar += skipMult*1;}
+    if (grid_movement)       { skipVar += nDim;}
+  }
+  
 
   /*--- Read all lines in the restart file ---*/
   long iPoint_Local; unsigned long iPoint_Global = 0; string text_line;
