@@ -5866,6 +5866,16 @@ void CDiscAdjFSIDriver::Run( ) {
 
   Postprocess(ZONE_FLOW, ZONE_STRUCT);
 
+  su2double solution[3];
+  for (unsigned long iPoint = 0; iPoint < geometry_container[ZONE_STRUCT][INST_0][MESH_0]->GetnPoint(); iPoint++) {
+    for (unsigned short iVar = 0; iVar < geometry_container[ZONE_STRUCT][INST_0][MESH_0]->GetnDim(); iVar++) {
+      solution[iVar] = solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->GetSolution(iVar)+
+        solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->GetGeometry_CrossTerm_Derivative(iVar)+
+        solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->GetCross_Term_Derivative(iVar);
+    }
+    solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->SetSolution(solution);
+  }
+
 }
 
 
