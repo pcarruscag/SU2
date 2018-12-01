@@ -152,7 +152,7 @@ CDiscAdjFEASolver::CDiscAdjFEASolver(CGeometry *geometry, CConfig *config, CSolv
 
   /*--- Define some auxiliary vectors related to the residual for problems with a BGS strategy---*/
 
-  if (fsi){
+  if (config->GetMultizone_Residual()){
 
     Residual_BGS      = new su2double[nVar];     for (iVar = 0; iVar < nVar; iVar++) Residual_BGS[iVar]      = 1.0;
     Residual_Max_BGS  = new su2double[nVar];     for (iVar = 0; iVar < nVar; iVar++) Residual_Max_BGS[iVar]  = 1.0;
@@ -625,6 +625,9 @@ void CDiscAdjFEASolver::RegisterVariables(CGeometry *geometry, CConfig *config, 
         }
 
         geometry->RegisterCoordinates(config);
+
+        if (config->GetTopology_Optimization())
+          direct_solver->RegisterVariables(geometry,config);
     }
 
   }
@@ -673,6 +676,9 @@ void CDiscAdjFEASolver::RegisterObj_Func(CConfig *config){
       break;
   case REFERENCE_NODE:
       ObjFunc_Value = direct_solver->GetTotal_OFRefNode();
+      break;
+  case VOLUME_FRACTION:
+      ObjFunc_Value = direct_solver->GetTotal_OFVolFrac();
       break;
   default:
       ObjFunc_Value = 0.0;  // If the objective function is computed in a different physical problem
@@ -920,6 +926,9 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
     }
     delete [] adj_coord;
 
+
+    if (config->GetTopology_Optimization())
+      direct_solver->ExtractAdjoint_Variables(geometry,config);
   }
 
 
@@ -1064,7 +1073,7 @@ void CDiscAdjFEASolver::SetSurface_Sensitivity(CGeometry *geometry, CConfig *con
 
 }
 
-void CDiscAdjFEASolver::ComputeResidual_BGS(CGeometry *geometry, CConfig *config){
+void CDiscAdjFEASolver::ComputeResidual_Multizone(CGeometry *geometry, CConfig *config){
 
   unsigned short iVar;
   unsigned long iPoint;
