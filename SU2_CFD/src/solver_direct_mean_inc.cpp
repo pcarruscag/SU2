@@ -109,6 +109,7 @@ CIncEulerSolver::CIncEulerSolver(CGeometry *geometry, CConfig *config, unsigned 
   bool time_stepping = config->GetUnsteady_Simulation() == TIME_STEPPING;
   bool adjoint = (config->GetContinuous_Adjoint()) || (config->GetDiscrete_Adjoint());
   bool fsi     = config->GetFSI_Simulation();
+  bool multizone = config->GetMultizone_Problem();
   string filename_ = config->GetSolution_FlowFileName();
 
   unsigned short direct_diff = config->GetDirectDiff();
@@ -230,7 +231,7 @@ CIncEulerSolver::CIncEulerSolver(CGeometry *geometry, CConfig *config, unsigned 
   /*--- Perform the non-dimensionalization for the flow equations using the
    specified reference values. ---*/
   
-  SetNondimensionalization(geometry, config, iMesh);
+  SetNondimensionalization(config, iMesh);
   
   /*--- Allocate the node variables ---*/
   
@@ -526,7 +527,7 @@ CIncEulerSolver::CIncEulerSolver(CGeometry *geometry, CConfig *config, unsigned 
     node[iPoint] = new CIncEulerVariable(Pressure_Inf, Velocity_Inf, Temperature_Inf, nDim, nVar, config);
 
   /*--- Initialize the BGS residuals in FSI problems. ---*/
-  if (fsi){
+  if (fsi || multizone){
     Residual_BGS      = new su2double[nVar];         for (iVar = 0; iVar < nVar; iVar++) Residual_RMS[iVar]  = 0.0;
     Residual_Max_BGS  = new su2double[nVar];         for (iVar = 0; iVar < nVar; iVar++) Residual_Max_BGS[iVar]  = 0.0;
 
@@ -1717,7 +1718,7 @@ void CIncEulerSolver::Set_MPI_Primitive_Limiter(CGeometry *geometry, CConfig *co
   
 }
 
-void CIncEulerSolver::SetNondimensionalization(CGeometry *geometry, CConfig *config, unsigned short iMesh) {
+void CIncEulerSolver::SetNondimensionalization(CConfig *config, unsigned short iMesh) {
   
   su2double Temperature_FreeStream = 0.0,  ModVel_FreeStream = 0.0,Energy_FreeStream = 0.0,
   ModVel_FreeStreamND = 0.0, Omega_FreeStream = 0.0, Omega_FreeStreamND = 0.0, Viscosity_FreeStream = 0.0,
@@ -6120,7 +6121,7 @@ void CIncEulerSolver::SetResidual_DualTime(CGeometry *geometry, CSolver **solver
   
 }
 
-void CIncEulerSolver::ComputeResidual_BGS(CGeometry *geometry, CConfig *config){
+void CIncEulerSolver::ComputeResidual_Multizone(CGeometry *geometry, CConfig *config){
 
   unsigned short iVar;
   unsigned long iPoint;
@@ -6194,7 +6195,19 @@ void CIncEulerSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConf
   /*--- Skip coordinates ---*/
 
   unsigned short skipVars = geometry[MESH_0]->GetnDim();
-
+  
+  /*--- Adjust the number of solution variables in the restart. We always
+   carry a space in nVar for the energy equation in the solver, but we only
+   write it to the restart if it is active. Therefore, we must reduce nVar
+   here if energy is inactive so that the restart is read correctly. ---*/
+  
+  bool energy               = config->GetEnergy_Equation();
+  bool weakly_coupled_heat  = config->GetWeakly_Coupled_Heat();
+  
+  unsigned short nVar_Restart = nVar;
+  if ((!energy) && (!weakly_coupled_heat)) nVar_Restart--;
+  Solution[nVar-1] = GetTemperature_Inf();
+  
   /*--- Multizone problems require the number of the zone to be appended. ---*/
 
   if (nZone > 1)
@@ -6229,7 +6242,7 @@ void CIncEulerSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConf
        offset in the buffer of data from the restart file and load it. ---*/
 
       index = counter*Restart_Vars[1] + skipVars;
-      for (iVar = 0; iVar < nVar; iVar++) Solution[iVar] = Restart_Data[index+iVar];
+      for (iVar = 0; iVar < nVar_Restart; iVar++) Solution[iVar] = Restart_Data[index+iVar];
       node[iPoint_Local]->SetSolution(Solution);
       iPoint_Global_Local++;
 
@@ -6259,7 +6272,7 @@ void CIncEulerSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConf
           for (iDim = 0; iDim < nDim; iDim++) { Coord[iDim] = Restart_Data[index+iDim]; }
 
           /*--- Move the index forward to get the grid velocities. ---*/
-          index = counter*Restart_Vars[1] + skipVars + nVar;
+          index = counter*Restart_Vars[1] + skipVars + nVar_Restart;
           for (iDim = 0; iDim < nDim; iDim++) { GridVel[iDim] = Restart_Data[index+iDim]; }
         }
 
@@ -6388,6 +6401,10 @@ void CIncEulerSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConf
     }
   }
   
+  /*--- Update the old geometry (coordinates n and n-1) in dual time-stepping strategy ---*/
+  if (dual_time && grid_movement)
+    Restart_OldGeometry(geometry[MESH_0], config);
+
   delete [] Coord;
 
   /*--- Delete the class memory that is used to load the restart. ---*/
@@ -6451,6 +6468,7 @@ CIncNSSolver::CIncNSSolver(CGeometry *geometry, CConfig *config, unsigned short 
   bool adjoint = (config->GetContinuous_Adjoint()) || (config->GetDiscrete_Adjoint());
   string filename_ = config->GetSolution_FlowFileName();
   bool fsi     = config->GetFSI_Simulation();
+  bool multizone = config->GetMultizone_Problem();
 
   unsigned short direct_diff = config->GetDirectDiff();
 
@@ -6536,7 +6554,7 @@ CIncNSSolver::CIncNSSolver(CGeometry *geometry, CConfig *config, unsigned short 
   /*--- Perform the non-dimensionalization for the flow equations using the
    specified reference values. ---*/
   
-  SetNondimensionalization(geometry, config, iMesh);
+  SetNondimensionalization(config, iMesh);
   
   /*--- Allocate the node variables ---*/
   node = new CVariable*[nPoint];
@@ -6930,7 +6948,7 @@ CIncNSSolver::CIncNSSolver(CGeometry *geometry, CConfig *config, unsigned short 
     node[iPoint] = new CIncNSVariable(Pressure_Inf, Velocity_Inf, Temperature_Inf, nDim, nVar, config);
 
   /*--- Initialize the BGS residuals in FSI problems. ---*/
-  if (fsi){
+  if (config->GetMultizone_Residual()){
     Residual_BGS      = new su2double[nVar];         for (iVar = 0; iVar < nVar; iVar++) Residual_RMS[iVar]  = 0.0;
     Residual_Max_BGS  = new su2double[nVar];         for (iVar = 0; iVar < nVar; iVar++) Residual_Max_BGS[iVar]  = 0.0;
 
