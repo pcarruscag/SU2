@@ -1410,11 +1410,13 @@ void CFEASolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, 
   bool body_forces = config->GetDeadLoad();                     // Body forces (dead loads).
   
   bool topology_mode = config->GetTopology_Optimization();  // Density-based topology optimization
+  
   bool fsi = config->GetFSI_Simulation();
   bool consistent_interpolation = !config->GetMatchingMesh() && (
                                   !config->GetConservativeInterpolation() ||
                                   (config->GetKindInterpolation() == WEIGHTED_AVERAGE));
-
+  
+  
   /*--- Set vector entries to zero ---*/
   for (iPoint = 0; iPoint < geometry->GetnPoint(); iPoint ++) {
     LinSysAux.SetBlock_Zero(iPoint);
