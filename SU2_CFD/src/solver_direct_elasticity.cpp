@@ -1412,8 +1412,7 @@ void CFEASolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, 
   bool topology_mode = config->GetTopology_Optimization();  // Density-based topology optimization
   
   bool fsi = config->GetFSI_Simulation();
-  bool consistent_interpolation = !config->GetMatchingMesh() && (
-                                  !config->GetConservativeInterpolation() ||
+  bool consistent_interpolation = (!config->GetConservativeInterpolation() ||
                                   (config->GetKindInterpolation() == WEIGHTED_AVERAGE));
   
   
