@@ -3176,6 +3176,9 @@ void CDiscAdjFEAIteration::SetDependencies(CSolver *****solver_container, CGeome
 
   geometry_container[iZone][iInst][MESH_0]->Set_MPI_Coord(config_container[iZone]);
 
+
+  solver_container[iZone][iInst][MESH_0][FEA_SOL]->Set_MPI_Solution(geometry_container[iZone][iInst][MESH_0], config_container[iZone]);
+
 }
 
 void CDiscAdjFEAIteration::RegisterOutput(CSolver *****solver_container, CGeometry ****geometry_container, CConfig **config_container, unsigned short iZone, unsigned short iInst){
