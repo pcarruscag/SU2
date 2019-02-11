@@ -80,7 +80,6 @@ CDiscAdjFEASolver::CDiscAdjFEASolver(CGeometry *geometry, CConfig *config, CSolv
   unsigned short iVar, iMarker, iDim;
 
   bool restart = config->GetRestart();
-  bool fsi = config->GetFSI_Simulation();
 
   restart = false;
 
@@ -152,7 +151,7 @@ CDiscAdjFEASolver::CDiscAdjFEASolver(CGeometry *geometry, CConfig *config, CSolv
 
   /*--- Define some auxiliary vectors related to the residual for problems with a BGS strategy---*/
 
-  if (fsi){
+  if (config->GetMultizone_Residual()){
 
     Residual_BGS      = new su2double[nVar];     for (iVar = 0; iVar < nVar; iVar++) Residual_BGS[iVar]      = 1.0;
     Residual_Max_BGS  = new su2double[nVar];     for (iVar = 0; iVar < nVar; iVar++) Residual_Max_BGS[iVar]  = 1.0;
@@ -624,6 +623,9 @@ void CDiscAdjFEASolver::RegisterVariables(CGeometry *geometry, CConfig *config, 
           for (iVar = 0; iVar < nDV; iVar++) AD::RegisterInput(DV_Val[iVar]);
         }
 
+        if (config->GetTopology_Optimization())
+          direct_solver->RegisterVariables(geometry,config);
+
         geometry->RegisterCoordinates(config);
     }
 
@@ -673,6 +675,9 @@ void CDiscAdjFEASolver::RegisterObj_Func(CConfig *config){
       break;
   case REFERENCE_NODE:
       ObjFunc_Value = direct_solver->GetTotal_OFRefNode();
+      break;
+  case VOLUME_FRACTION:
+      ObjFunc_Value = direct_solver->GetTotal_OFVolFrac();
       break;
   default:
       ObjFunc_Value = 0.0;  // If the objective function is computed in a different physical problem
@@ -909,8 +914,10 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
 
     }
 
+    if (config->GetTopology_Optimization())
+      direct_solver->ExtractAdjoint_Variables(geometry,config);
+
     /*--- Extract the adjoint values of the grid coordinates ---*/
-    
     su2double *adj_coord = new su2double[nDim];
     for (iPoint = 0; iPoint < nPoint; ++iPoint) {
       geometry->node[iPoint]->GetAdjointCoord(adj_coord);
@@ -919,7 +926,6 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
         node[iPoint]->SetSensitivity(iDim, adj_coord[iDim]);
     }
     delete [] adj_coord;
-
   }
 
 
@@ -1064,7 +1070,7 @@ void CDiscAdjFEASolver::SetSurface_Sensitivity(CGeometry *geometry, CConfig *con
 
 }
 
-void CDiscAdjFEASolver::ComputeResidual_BGS(CGeometry *geometry, CConfig *config){
+void CDiscAdjFEASolver::ComputeResidual_Multizone(CGeometry *geometry, CConfig *config){
 
   unsigned short iVar;
   unsigned long iPoint;

@@ -205,7 +205,7 @@ public:
    * \brief Set the value of the max residual and RMS residual.
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
-  virtual void ComputeResidual_BGS(CGeometry *geometry, CConfig *config);
+  virtual void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
 
   /*!
    * \brief Store the BGS solution in the previous subiteration in the corresponding vector.
@@ -2069,6 +2069,11 @@ public:
   
   /*!
    * \brief A virtual member.
+   */
+  virtual void GetOutlet_Properties(CGeometry *geometry, CConfig *config, unsigned short iMesh, bool Output);
+  
+  /*!
+   * \brief A virtual member.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solution - Container vector with all the solutions.
    */
@@ -2280,6 +2285,12 @@ public:
    * \return Value of the objective function for a reference node.
    */
   virtual su2double GetTotal_OFRefNode(void);
+  
+  /*!
+   * \brief A virtual member.
+   * \return Value of the objective function for the volume fraction.
+   */
+  virtual su2double GetTotal_OFVolFrac(void);
 
   /*!
    * \brief A virtual member.
@@ -3443,7 +3454,7 @@ public:
   virtual void ComputeAitken_Coefficient(CGeometry **fea_geometry,
                                          CConfig *fea_config,
                                          CSolver ***fea_solution,
-                                         unsigned long iFSIIter);
+                                         unsigned long iOuterIter);
   
   
   /*!
@@ -3541,6 +3552,14 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   virtual void Compute_OFRefNode(CGeometry *geometry, CSolver **solver_container, CConfig *config);
+  
+  /*!
+   * \brief A virtual member.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config - Definition of the particular problem.
+   */
+  virtual void Compute_OFVolFrac(CGeometry *geometry, CSolver **solver_container, CConfig *config);
 
   /*!
    * \brief A virtual member.
@@ -6492,7 +6511,7 @@ public:
    * \brief Set the value of the max residual and RMS residual.
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
-  void ComputeResidual_BGS(CGeometry *geometry, CConfig *config);
+  void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
 
   /*!
    * \brief Store the BGS solution in the previous subiteration in the corresponding vector.
@@ -7103,6 +7122,11 @@ protected:
   CFluidModel  *FluidModel;  /*!< \brief fluid model used in the solver */
   su2double **Preconditioner; /*!< \brief Auxiliary matrix for storing the low speed preconditioner. */
 
+  /* Sliding meshes variables */
+
+  su2double ****SlidingState;
+  int **SlidingStateNodes;
+
 public:
   
   /*!
@@ -7459,6 +7483,16 @@ public:
   void BC_Outlet(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics,
                  CConfig *config, unsigned short val_marker);
   
+  /*!
+   * \brief Impose the interface state across sliding meshes.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] conv_numerics - Description of the numerical method.
+   * \param[in] visc_numerics - Description of the numerical method.
+   * \param[in] config - Definition of the particular problem.
+   */
+   void BC_Fluid_Interface(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics, CConfig *config);
+
    /*!
     * \brief compare to values.
     * \param[in] a - value 1.
@@ -8161,7 +8195,7 @@ public:
    * \brief Set the value of the max residual and BGS residual.
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
-  void ComputeResidual_BGS(CGeometry *geometry, CConfig *config);
+  void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
 
   /*!
    * \brief Store the BGS solution in the previous subiteration in the corresponding vector.
@@ -8288,7 +8322,53 @@ public:
                              string val_marker,
                              CGeometry *geometry,
                              CConfig *config);
+  
+  /*!
+   * \brief A virtual member.
+   */
+  void GetOutlet_Properties(CGeometry *geometry, CConfig *config, unsigned short iMesh, bool Output);
 
+  /*!
+   * \brief Allocates the final pointer of SlidingState depending on how many donor vertex donate to it. That number is stored in SlidingStateNodes[val_marker][val_vertex].
+   * \param[in] val_marker   - marker index
+   * \param[in] val_vertex   - vertex index
+   */
+  void SetSlidingStateStructure(unsigned short val_marker, unsigned long val_vertex);
+
+  /*!
+   * \brief Set the outer state for fluid interface nodes.
+   * \param[in] val_marker   - marker index
+   * \param[in] val_vertex   - vertex index
+   * \param[in] val_state    - requested state component
+   * \param[in] donor_index  - index of the donor node to set
+   * \param[in] component    - set value
+   */
+  void SetSlidingState(unsigned short val_marker, unsigned long val_vertex, unsigned short val_state, unsigned long donor_index, su2double component);
+
+  /*!
+   * \brief Set the number of outer state for fluid interface nodes.
+   * \param[in] val_marker - marker index
+   * \param[in] val_vertex - vertex index
+   * \param[in] value - number of outer states
+   */
+  void SetnSlidingStates(unsigned short val_marker, unsigned long val_vertex, int value);
+
+  /*!
+   * \brief Get the number of outer state for fluid interface nodes.
+   * \param[in] val_marker - marker index
+   * \param[in] val_vertex - vertex index
+   */
+  int GetnSlidingStates(unsigned short val_marker, unsigned long val_vertex);
+
+  /*!
+   * \brief Get the outer state for fluid interface nodes.
+   * \param[in] val_marker - marker index
+   * \param[in] val_vertex - vertex index
+   * \param[in] val_state  - requested state component
+   */
+   su2double GetSlidingState(unsigned short val_marker, unsigned long val_vertex, unsigned short val_state, unsigned long donor_index);
+
+  
 };
 
 /*!
@@ -11602,6 +11682,12 @@ public:
    */
   void SetResidual_DualTime(CGeometry *geometry, CSolver **solver_container, CConfig *config,
                             unsigned short iRKStep, unsigned short iMesh, unsigned short RunTime_EqSystem);
+
+  /*!
+   * \brief Set the value of the max residual and BGS residual.
+   * \param[in] val_iterlinsolver - Number of linear iterations.
+   */
+  void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
 };
 
 /*! \class CFEASolver
@@ -11669,6 +11755,7 @@ private:
 
   su2double Total_OFRefGeom;        /*!< \brief Total Objective Function: Reference Geometry. */
   su2double Total_OFRefNode;        /*!< \brief Total Objective Function: Reference Node. */
+  su2double Total_OFVolFrac;        /*!< \brief Total Objective Function: Volume fraction (topology optimization). */
 
   su2double Global_OFRefGeom;        /*!< \brief Global Objective Function (added over time steps): Reference Geometry. */
   su2double Global_OFRefNode;        /*!< \brief Global Objective Function (added over time steps): Reference Node. */
@@ -11961,7 +12048,13 @@ public:
   void BC_Damper(CGeometry *geometry, CSolver **solver_container, CNumerics *numerics, CConfig *config,
                  unsigned short val_marker);
 
-  
+  /*!
+   * \brief Required step for non conservative interpolation schemes where stresses are transferred instead of forces.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void Integrate_FSI_Loads(CGeometry *geometry, CConfig *config);
+
   /*!
    * \brief Update the solution using an implicit solver.
    * \param[in] geometry - Geometrical definition of the problem.
@@ -12064,10 +12157,16 @@ public:
   su2double GetTotal_OFRefGeom(void);
   
   /*!
-   * \brief Retrieve the value of the objective function for a reference geometry
-   * \param[out] OFRefGeom - value of the objective function.
+   * \brief Retrieve the value of the objective function for a reference node
+   * \param[out] OFRefNode - value of the objective function.
    */
   su2double GetTotal_OFRefNode(void);
+  
+  /*!
+   * \brief Retrieve the value of the volume fraction objective function
+   * \param[out] OFVolFrac - value of the objective function.
+   */
+  su2double GetTotal_OFVolFrac(void);
 
   /*!
    * \brief Determines whether there is an element-based file or not.
@@ -12152,7 +12251,7 @@ public:
   void ComputeAitken_Coefficient(CGeometry **fea_geometry,
                                  CConfig *fea_config,
                                  CSolver ***fea_solution,
-                                 unsigned long iFSIIter);
+                                 unsigned long iOuterIter);
   
   /*!
    * \brief Aitken's relaxation of the solution.
@@ -12189,6 +12288,14 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   void Compute_OFRefNode(CGeometry *geometry, CSolver **solver_container, CConfig *config);
+  
+  /*!
+   * \brief Compute the objective function for a volume fraction
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void Compute_OFVolFrac(CGeometry *geometry, CSolver **solver_container, CConfig *config);
 
   /*!
    * \brief Compute the penalty due to the stiffness increase
@@ -12275,7 +12382,7 @@ public:
    * \brief Set the value of the max residual and BGS residual.
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
-  void ComputeResidual_BGS(CGeometry *geometry, CConfig *config);
+  void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
 
   /*!
    * \brief Store the BGS solution in the previous subiteration in the corresponding vector.
@@ -12306,6 +12413,27 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   su2double Compute_LoadCoefficient(su2double CurrentTime, su2double RampTime, CConfig *config);
+  
+  /*!
+   * \brief A virtual member.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void RegisterVariables(CGeometry *geometry, CConfig *config, bool reset = false);
+  
+  /*!
+   * \brief A virtual member.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void ExtractAdjoint_Variables(CGeometry *geometry, CConfig *config);
+  
+  /*!
+   * \brief Filter the density field for topology optimization applications
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void FilterElementDensities(CGeometry *geometry, CConfig *config);
 
 };
 
@@ -12786,7 +12914,7 @@ public:
    * \brief Set the value of the max residual and RMS residual.
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
-  void ComputeResidual_BGS(CGeometry *geometry, CConfig *config);
+  void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
   
   /*!
    * \brief Store the BGS solution in the previous subiteration in the corresponding vector.
@@ -13084,7 +13212,7 @@ public:
    * \brief Set the value of the max residual and RMS residual.
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
-  void ComputeResidual_BGS(CGeometry *geometry, CConfig *config);
+  void ComputeResidual_Multizone(CGeometry *geometry, CConfig *config);
   
   /*!
    * \brief Store the BGS solution in the previous subiteration in the corresponding vector.
@@ -13430,6 +13558,7 @@ public:
   void SetNondimensionalization(CConfig        *config,
                                 unsigned short iMesh,
                                 const bool     writeOutput);
+  using CSolver::SetNondimensionalization;
 
   /*!
    * \brief Get a pointer to the vector of the solution degrees of freedom.
@@ -13762,6 +13891,7 @@ public:
                              su2double                *resFaces,
                              CNumerics                *conv_numerics,
                              su2double                *workArray);
+  using CSolver::BC_Euler_Wall;
 
   /*!
    * \brief Impose the far-field boundary condition. It is a virtual
@@ -13783,6 +13913,7 @@ public:
                             su2double                *resFaces,
                             CNumerics                *conv_numerics,
                             su2double                *workArray);
+  using CSolver::BC_Far_Field;
 
   /*!
    * \brief Impose the symmetry boundary condition. It is a virtual
@@ -13804,6 +13935,7 @@ public:
                             su2double                *resFaces,
                             CNumerics                *conv_numerics,
                             su2double                *workArray);
+  using CSolver::BC_Sym_Plane;
 
   /*!
    * \brief Impose the supersonic outlet boundary condition. It is a virtual
@@ -13825,6 +13957,7 @@ public:
                                     su2double                *resFaces,
                                     CNumerics                *conv_numerics,
                                     su2double                *workArray);
+  using CSolver::BC_Supersonic_Outlet;
 
   /*!
    * \brief Impose the subsonic inlet boundary condition. It is a virtual
@@ -13848,6 +13981,7 @@ public:
                         CNumerics                *conv_numerics,
                         unsigned short           val_marker,
                         su2double                *workArray);
+  using CSolver::BC_Inlet;
 
   /*!
    * \brief Impose the outlet boundary condition.It is a virtual
@@ -13871,6 +14005,7 @@ public:
                          CNumerics                *conv_numerics,
                          unsigned short           val_marker,
                          su2double                *workArray);
+  using CSolver::BC_Outlet;
 
   /*!
    * \brief Impose a constant heat-flux condition at the wall. It is a virtual
@@ -13894,6 +14029,7 @@ public:
                                 CNumerics                *conv_numerics,
                                 unsigned short           val_marker,
                                 su2double                *workArray);
+  using CSolver::BC_HeatFlux_Wall;
 
   /*!
    * \brief Impose an isothermal condition at the wall. It is a virtual
@@ -13917,6 +14053,7 @@ public:
                                   CNumerics                *conv_numerics,
                                   unsigned short           val_marker,
                                   su2double                *workArray);
+  using CSolver::BC_Isothermal_Wall;
 
   /*!
    * \brief Impose the boundary condition using characteristic reconstruction. It is
@@ -13940,6 +14077,7 @@ public:
                           CNumerics                *conv_numerics,
                           unsigned short           val_marker,
                           su2double                *workArray);
+  using CSolver::BC_Riemann;
 
   /*!
    * \brief Impose the user customized boundary condition. It is a virtual
@@ -13961,6 +14099,7 @@ public:
                          su2double                *resFaces,
                          CNumerics                *conv_numerics,
                          su2double                *workArray);
+  using CSolver::BC_Custom;
 
 #ifdef RINGLEB
   /*!

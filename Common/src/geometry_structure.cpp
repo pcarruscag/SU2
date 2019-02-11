@@ -37,9 +37,13 @@
 
 #include "../include/geometry_structure.hpp"
 #include "../include/adt_structure.hpp"
+#include "../include/toolboxes/printing_toolbox.hpp"
+#include "../include/element_structure.hpp"
 #include <iomanip>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <iterator>
+
 /*--- Epsilon definition ---*/
 
 #define EPSILON 0.000001
@@ -1853,6 +1857,353 @@ void CGeometry::ComputeSurf_Curvature(CConfig *config) {
   delete[] Buffer_Send_nVertex;
   delete[] Buffer_Receive_nVertex;
   
+}
+
+void CGeometry::FilterValuesAtElementCG(const vector<su2double> filter_radius,
+                                        const vector<pair<unsigned short,su2double> > &kernels,
+                                        const su2double *input_values,
+                                        su2double *output_values) const
+{
+  /*--- Apply a filter to "input_values". The filter is an averaging process over the neighbourhood
+  of each element, which is a circle in 2D and a sphere in 3D of radius "filter_radius".
+  The filter is characterized by its kernel, i.e. how the weights are computed. Multiple kernels
+  can be specified in which case they are applied sequentially (each one being applied to the
+  output values of the previous filter. ---*/
+  
+  unsigned long iElem, iElem_global;
+  
+  /*--- Initialize output values and check if we need to do any more work than that ---*/
+  for (iElem=0; iElem<nElem; ++iElem)
+    output_values[iElem] = input_values[iElem];
+
+  if ( kernels.empty() ) return;
+
+  /*--- FIRST: Gather the adjacency matrix, element centroids, volumes, and values on every
+  processor, this is required because the filter reaches far into adjacent partitions. ---*/
+  
+  /*--- Adjacency matrix ---*/
+  vector<unsigned long> neighbour_start;
+  long *neighbour_idx = NULL;
+  GetGlobalElementAdjacencyMatrix(neighbour_start,neighbour_idx);
+
+  /*--- Element centroids and volumes ---*/
+  su2double *cg_elem  = new su2double [Global_nElemDomain*nDim],
+            *vol_elem = new su2double [Global_nElemDomain];
+
+  /*--- Initialize ---*/
+  for(iElem=0; iElem<Global_nElemDomain; ++iElem) {
+    for(unsigned short iDim=0; iDim<nDim; ++iDim)
+      cg_elem[nDim*iElem+iDim] = 0.0;
+    vol_elem[iElem] = 0.0;
+  }
+  /*--- Populate ---*/
+  for(iElem=0; iElem<nElem; ++iElem) {
+    iElem_global = elem[iElem]->GetGlobalIndex();
+    for(unsigned short iDim=0; iDim<nDim; ++iDim) 
+      cg_elem[nDim*iElem_global+iDim] = elem[iElem]->GetCG(iDim);
+    vol_elem[iElem_global] = elem[iElem]->GetVolume();
+  }
+#ifdef HAVE_MPI
+  /*--- Share with all processors ---*/
+  {
+    su2double *buffer = NULL, *tmp = NULL;
+
+    buffer = new su2double [Global_nElemDomain*nDim];
+    SU2_MPI::Allreduce(cg_elem,buffer,Global_nElemDomain*nDim,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    tmp = cg_elem; cg_elem = buffer; delete [] tmp;
+
+    buffer = new su2double [Global_nElemDomain];
+    SU2_MPI::Allreduce(vol_elem,buffer,Global_nElemDomain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    tmp = vol_elem; vol_elem = buffer; delete [] tmp;
+  }
+  
+  /*--- Account for the duplication introduced by the halo elements and the
+  reduction using MPI_SUM, which is required to maintain differentiabillity. ---*/
+  unsigned short *halo_detect = new unsigned short [Global_nElemDomain];
+
+  for(iElem=0; iElem<Global_nElemDomain; ++iElem) halo_detect[iElem] = 0;
+  for(iElem=0; iElem<nElem; ++iElem) halo_detect[elem[iElem]->GetGlobalIndex()] = 1;
+  {
+    unsigned short *buffer = new unsigned short [Global_nElemDomain], *tmp = NULL;
+    MPI_Allreduce(halo_detect,buffer,Global_nElemDomain,MPI_UNSIGNED_SHORT,MPI_SUM,MPI_COMM_WORLD);
+    tmp = halo_detect; halo_detect = buffer; delete [] tmp;
+  }
+  for(iElem=0; iElem<Global_nElemDomain; ++iElem) {
+    su2double numRepeat = halo_detect[iElem];
+    for(unsigned short iDim=0; iDim<nDim; ++iDim)
+      cg_elem[nDim*iElem+iDim] /= numRepeat;
+    vol_elem[iElem] /= numRepeat;
+  }
+#endif
+
+
+  /*--- SECOND: Each processor performs the average for its elements. For each
+  element we look for neighbours of neighbours of... until the distance to the
+  closest newly found one is greater than the filter radius.  ---*/
+
+  /*--- Inputs of a filter stage, like with CG and volumes, each processor needs to see everything ---*/
+  su2double *work_values = new su2double [Global_nElemDomain];
+  
+  for (unsigned long iKernel=0; iKernel<kernels.size(); ++iKernel)
+  {
+    unsigned short kernel_type = kernels[iKernel].first;
+    su2double kernel_param = kernels[iKernel].second;
+    su2double kernel_radius = filter_radius[iKernel];
+
+    /*--- Synchronize work values ---*/
+    /*--- Initialize ---*/
+    for(iElem=0; iElem<Global_nElemDomain; ++iElem) work_values[iElem] = 0.0;
+    /*--- Populate ---*/
+    for(iElem=0; iElem<nElem; ++iElem)
+      work_values[elem[iElem]->GetGlobalIndex()] = output_values[iElem];
+#ifdef HAVE_MPI
+    /*--- Share with all processors ---*/
+    {
+      su2double *buffer = new su2double [Global_nElemDomain], *tmp = NULL;
+      SU2_MPI::Allreduce(work_values,buffer,Global_nElemDomain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+      tmp = work_values; work_values = buffer; delete [] tmp;
+    }
+    /*--- Account for duplication ---*/
+    for(iElem=0; iElem<Global_nElemDomain; ++iElem) {
+      su2double numRepeat = halo_detect[iElem];
+      work_values[iElem] /= numRepeat;
+    }
+#endif
+
+    /*--- Filter ---*/
+    for (iElem=0; iElem<nElem; ++iElem)
+    {
+      /*--- Center of the search ---*/
+      iElem_global = elem[iElem]->GetGlobalIndex();
+    
+      /*--- Find the neighbours of iElem ---*/
+      vector<long> neighbours;
+      GetRadialNeighbourhood(iElem_global, SU2_TYPE::GetValue(kernel_radius),
+                             neighbour_start, neighbour_idx, cg_elem, neighbours);
+    
+      /*--- Apply the kernel ---*/
+      su2double weight = 0.0, numerator = 0.0, denominator = 0.0;
+    
+      switch ( kernel_type ) {
+        /*--- distance-based kernels (weighted averages) ---*/
+        case CONSTANT_WEIGHT_FILTER: case CONICAL_WEIGHT_FILTER: case GAUSSIAN_WEIGHT_FILTER:
+            
+          for (vector<long>::iterator it=neighbours.begin(); it!=neighbours.end(); ++it)
+          {
+            su2double distance = 0.0;
+            for (unsigned short iDim=0; iDim<nDim; ++iDim)
+              distance += pow(cg_elem[nDim*iElem_global+iDim]-cg_elem[nDim*(*it)+iDim],2.0);
+            distance = sqrt(distance);
+      
+            switch ( kernel_type ) {
+              case CONSTANT_WEIGHT_FILTER: weight = 1.0; break;
+              case CONICAL_WEIGHT_FILTER:  weight = kernel_radius-distance; break;
+              case GAUSSIAN_WEIGHT_FILTER: weight = exp(-0.5*pow(distance/kernel_param,2.0)); break;
+              default: break;
+            }
+            weight *= vol_elem[*it];
+            numerator   += weight*work_values[*it];
+            denominator += weight;
+          }
+          output_values[iElem] = numerator/denominator;
+          break;
+          
+        /*--- morphology kernels (image processing) ---*/
+        case DILATE_MORPH_FILTER: case ERODE_MORPH_FILTER:
+            
+          for (vector<long>::iterator it=neighbours.begin(); it!=neighbours.end(); ++it)
+          {
+            switch ( kernel_type ) {
+              case DILATE_MORPH_FILTER: numerator += exp(kernel_param*work_values[*it]); break;
+              case ERODE_MORPH_FILTER:  numerator += exp(kernel_param*(1.0-work_values[*it])); break;
+              default: break;
+            }
+            denominator += 1.0;
+          }
+          output_values[iElem] = log(numerator/denominator)/kernel_param;
+          if ( kernel_type==ERODE_MORPH_FILTER ) output_values[iElem] = 1.0-output_values[iElem];
+          break;
+          
+        default:
+          SU2_MPI::Error("Unknown type of filter kernel",CURRENT_FUNCTION);
+      }
+    }
+  }
+  
+  delete [] neighbour_idx;
+  delete [] cg_elem;
+  delete [] vol_elem;
+  delete [] work_values;
+#ifdef HAVE_MPI
+  delete [] halo_detect;
+#endif
+}
+
+void CGeometry::GetGlobalElementAdjacencyMatrix(vector<unsigned long> &neighbour_start,
+                                                long *&neighbour_idx) const
+{
+  unsigned long iElem, iElem_global;
+
+  /*--- Determine how much space we need for the adjacency matrix by counting the
+  neighbours of each element, i.e. its number of faces---*/
+  unsigned short *nFaces_elem = new unsigned short [Global_nElemDomain];
+
+  for(iElem=0; iElem<Global_nElemDomain; ++iElem) nFaces_elem[iElem] = 0;
+
+  for(iElem=0; iElem<nElem; ++iElem) {
+    iElem_global = elem[iElem]->GetGlobalIndex();
+    nFaces_elem[iElem_global] = elem[iElem]->GetnFaces();
+  }
+#ifdef HAVE_MPI
+  /*--- Share with all processors ---*/
+  {
+    unsigned short *buffer = new unsigned short [Global_nElemDomain], *tmp = NULL;
+    MPI_Allreduce(nFaces_elem,buffer,Global_nElemDomain,MPI_UNSIGNED_SHORT,MPI_MAX,MPI_COMM_WORLD);
+    /*--- swap pointers and delete old data to keep the same variable name after reduction ---*/
+    tmp = nFaces_elem; nFaces_elem = buffer; delete [] tmp;
+  }
+#endif
+
+  /*--- Vector with the addresses of the start of the neighbours of a given element.
+  This is generated by a cumulative sum of the neighbour count. ---*/
+  neighbour_start.resize(Global_nElemDomain+1);
+  
+  neighbour_start[0] = 0;
+  for(iElem=0; iElem<Global_nElemDomain; ++iElem) {
+    neighbour_start[iElem+1] = neighbour_start[iElem]+nFaces_elem[iElem];
+  }
+  delete [] nFaces_elem;
+
+  /*--- Allocate ---*/
+  unsigned long matrix_size = neighbour_start[Global_nElemDomain];
+  if ( neighbour_idx != NULL )
+    SU2_MPI::Error("neighbour_idx is expected to be NULL, stopping to avoid a potential memory leak",CURRENT_FUNCTION);
+  neighbour_idx = new long [matrix_size];
+  /*--- Initialize ---*/
+  for(iElem=0; iElem<matrix_size; ++iElem) neighbour_idx[iElem] = -1;
+  /*--- Populate ---*/
+  for(iElem=0; iElem<nElem; ++iElem)
+  {
+    iElem_global = elem[iElem]->GetGlobalIndex();
+    unsigned long start_pos = neighbour_start[iElem_global];
+    
+    for(unsigned short iFace=0; iFace<elem[iElem]->GetnFaces(); ++iFace)
+    {
+      long neighbour = elem[iElem]->GetNeighbor_Elements(iFace);
+      
+      if ( neighbour>=0 ) {
+        neighbour_idx[start_pos+iFace] = elem[neighbour]->GetGlobalIndex();
+      }
+    }
+  }
+#ifdef HAVE_MPI
+  /*--- Share with all processors ---*/
+  {
+    long *buffer = new long [matrix_size], *tmp = NULL;
+    MPI_Allreduce(neighbour_idx,buffer,matrix_size,MPI_LONG,MPI_MAX,MPI_COMM_WORLD);
+    tmp = neighbour_idx; neighbour_idx = buffer; delete [] tmp;
+  }
+#endif
+}
+
+void CGeometry::GetRadialNeighbourhood(const unsigned long iElem_global,
+                                       const passivedouble radius,
+                                       const vector<unsigned long> &neighbour_start,
+                                       const long *neighbour_idx,
+                                       const su2double *cg_elem,
+                                       vector<long> &neighbours) const
+{
+  /*--- Center of the search ---*/
+  neighbours.clear(); neighbours.push_back(iElem_global);
+
+  vector<passivedouble> X0(nDim);
+  for (unsigned short iDim=0; iDim<nDim; ++iDim)
+    X0[iDim] = SU2_TYPE::GetValue(cg_elem[nDim*iElem_global+iDim]);
+
+  /*--- A way to locate neighbours of a given degree (1st degree are direct neighbours).
+  "degree_start"[degree] is the position in "neighbours" where "degree" starts. ---*/
+  vector<unsigned long> degree_start(1,0);
+
+  /*--- Loop stops when "neighbours" stops changing size. ---*/
+  vector<long>::iterator cursor_it = neighbours.begin(), aux_it;
+  while (cursor_it != neighbours.end())
+  {
+    /*--- Add another degree. ---*/
+    long current_degree = degree_start.size();
+    degree_start.push_back(neighbours.size());
+
+    /*--- For each element of the last degree added, add its direct neighbours avoiding
+    duplicates, note the special value -1 at the start position of "candidates". ---*/
+    vector<long> candidates(1,-1);
+
+    for (; cursor_it!=neighbours.end(); ++cursor_it)
+    {
+      /*--- Locators to access this "row" of the adjacency matrix. ---*/
+      unsigned long row_begin = neighbour_start[ *cursor_it],
+                    row_end   = neighbour_start[(*cursor_it)+1];
+
+      for (unsigned long i=row_begin; i<row_end; ++i)
+        if (find(candidates.begin(), candidates.end(), neighbour_idx[i]) == candidates.end())
+          candidates.push_back(neighbour_idx[i]);
+    }
+
+    /*--- Avoid duplication of previouly added neighbours.
+    Only the last two degrees need checking. ---*/
+    vector<long> new_neighbours;
+    long degree_to_check = max<long>(0,current_degree-2);
+    vector<long>::iterator search_begin = neighbours.begin()+degree_start[degree_to_check];
+
+    for (aux_it=candidates.begin()+1; aux_it<candidates.end(); ++aux_it)
+      if (find(search_begin, neighbours.end(), *aux_it) == neighbours.end())
+        new_neighbours.push_back(*aux_it);
+
+    /*--- Add the new neighbours that are inside the radius. ---*/
+    for (aux_it=new_neighbours.begin(); aux_it!=new_neighbours.end(); ++aux_it)
+    {
+      /*--- passivedouble because we are still not going to calculate anything ---*/
+      passivedouble distance = 0.0;
+      for (unsigned short iDim=0; iDim<nDim; ++iDim)
+        distance += pow(X0[iDim]-SU2_TYPE::GetValue(cg_elem[nDim*(*aux_it)+iDim]),2.0);
+
+      if(sqrt(distance) < radius) neighbours.push_back(*aux_it);
+    }
+    /*--- need new iterator (to same position where it was) after change of capacity ---*/
+    cursor_it = neighbours.begin()+degree_start[current_degree];
+  }
+}
+
+void CGeometry::SetElemVolume(CConfig *config)
+{
+  /*--- Compute and store the volume of each "elem" ---*/
+  for (unsigned long iElem=0; iElem<nElem; ++iElem)
+  {
+    CElement *element = NULL;
+
+    /*--- Get the appropriate type of element ---*/
+    switch (elem[iElem]->GetVTK_Type()) {
+      case TRIANGLE:      element = new CTRIA1( nDim,config); break;
+      case QUADRILATERAL: element = new CQUAD4( nDim,config); break;
+      case TETRAHEDRON:   element = new CTETRA1(nDim,config); break;
+      case PYRAMID:       element = new CPYRAM5(nDim,config); break;
+      case PRISM:         element = new CPRISM6(nDim,config); break;
+      case HEXAHEDRON:    element = new CHEXA8( nDim,config); break;
+      default:
+        SU2_MPI::Error("Cannot compute the area/volume of a 1D element.",CURRENT_FUNCTION);
+    }
+    /*--- Set the nodal coordinates of the element ---*/
+    for (unsigned short iNode=0; iNode<elem[iElem]->GetnNodes(); ++iNode) {
+      unsigned long node_idx = elem[iElem]->GetNode(iNode);
+      for (unsigned short iDim=0; iDim<nDim; ++iDim) {
+        su2double coord = node[node_idx]->GetCoord(iDim);
+        element->SetRef_Coord(coord, iNode, iDim);
+      }
+    }
+    /*--- Compute ---*/
+    if(nDim==2) elem[iElem]->SetVolume(element->ComputeArea());
+    else        elem[iElem]->SetVolume(element->ComputeVolume());
+
+    delete element;
+  }
 }
 
 CPhysicalGeometry::CPhysicalGeometry() : CGeometry() {
@@ -8561,6 +8912,7 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
   bool domain_flag = false;
   bool found_transform = false;
   bool harmonic_balance = config->GetUnsteady_Simulation() == HARMONIC_BALANCE;
+  bool multizone_file = config->GetMultizone_Mesh();
   bool actuator_disk  = (((config->GetnMarker_ActDiskInlet() != 0) ||
                           (config->GetnMarker_ActDiskOutlet() != 0)) &&
                          ((config->GetKind_SU2() == SU2_CFD) ||
@@ -9106,7 +9458,7 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
   
   /*--- If more than one, find the zone in the mesh file ---*/
   
-  if (val_nZone > 1 || harmonic_balance) {
+  if ((val_nZone > 1 && multizone_file) || harmonic_balance) {
     if (harmonic_balance) {
       if (rank == MASTER_NODE) cout << "Reading time instance " << config->GetiInst()+1 << "." << endl;
     } else {
@@ -9362,7 +9714,7 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
   
   /*--- If more than one, find the zone in the mesh file  ---*/
 
-  if (val_nZone > 1) {
+  if (val_nZone > 1 && multizone_file) {
     while (getline (mesh_file,text_line)) {
       /*--- Search for the current domain ---*/
       position = text_line.find ("IZONE=",0);
@@ -9907,7 +10259,7 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
   
   /*--- If more than one, find the zone in the mesh file  ---*/
   
-  if (val_nZone > 1) {
+  if (val_nZone > 1 && multizone_file) {
     while (getline (mesh_file,text_line)) {
       /*--- Search for the current domain ---*/
       position = text_line.find ("IZONE=",0);
@@ -10249,7 +10601,7 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
   /*--- If more than one, find the zone in the mesh file ---*/
   
 
-  if (val_nZone > 1) {
+  if (val_nZone > 1 && multizone_file) {
     while (getline (mesh_file,text_line)) {
       /*--- Search for the current domain ---*/
       position = text_line.find ("IZONE=",0);
@@ -10283,6 +10635,13 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
         
         bool duplicate = false;
         iMarker=0;
+        PrintingToolbox::CTablePrinter BoundaryTable(&std::cout);
+        BoundaryTable.AddColumn("Index", 6);
+        BoundaryTable.AddColumn("Marker", 14);
+        BoundaryTable.AddColumn("Elements", 14);
+        if (rank == MASTER_NODE){
+          BoundaryTable.PrintHeader();
+        }
         do {
           
           getline (mesh_file, text_line);
@@ -10313,8 +10672,10 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
             if (duplicate)  nElem_Bound[iMarker+1]  = nElem_Bound[iMarker];
 
             if (rank == MASTER_NODE) {
-              cout << nElem_Bound[iMarker]  << " boundary elements in index "<< iMarker <<" (Marker = " <<Marker_Tag<< ")." << endl;
-              if (duplicate)  cout << nElem_Bound[iMarker+1]  << " boundary elements in index "<< iMarker+1 <<" (Marker = " <<Marker_Tag_Duplicate<< ")." << endl;
+              BoundaryTable << iMarker << Marker_Tag << nElem_Bound[iMarker];
+              if (duplicate){
+                BoundaryTable << iMarker+1 << Marker_Tag_Duplicate << nElem_Bound[iMarker+1];                
+              }
             }
             
             /*--- Allocate space for elements ---*/
@@ -10456,7 +10817,9 @@ void CPhysicalGeometry::Read_SU2_Format_Parallel(CConfig *config, string val_mes
           iMarker++;
           
         } while (iMarker < nMarker);
-        
+        if (rank == MASTER_NODE){
+          BoundaryTable.PrintFooter();
+        }
         if (boundary_marker_count == nMarker) break;
         
       }
@@ -14217,7 +14580,6 @@ void CPhysicalGeometry::SetTurboVertex(CConfig *config, unsigned short val_iZone
   if (rank == MASTER_NODE){
     if (marker_flag == INFLOW && val_iZone ==0){
       std::string sPath = "TURBOMACHINERY";
-      mode_t nMode = 0733; // UNIX style permissions
       int nError = 0;
 #if defined(_WIN32)
 #ifdef __MINGW32__
@@ -14226,6 +14588,7 @@ void CPhysicalGeometry::SetTurboVertex(CConfig *config, unsigned short val_iZone
       nError = _mkdir(sPath.c_str()); // can be used on Windows
 #endif
 #else
+      mode_t nMode = 0733; // UNIX style permissions
       nError = mkdir(sPath.c_str(),nMode); // can be used on non-Windows
 #endif
       if (nError != 0) {
@@ -15696,160 +16059,6 @@ void CPhysicalGeometry::MatchActuator_Disk(CConfig *config) {
       
     }
   }
-  
-}
-
-void CPhysicalGeometry::MatchZone(CConfig *config, CGeometry *geometry_donor, CConfig *config_donor,
-                                  unsigned short val_iZone, unsigned short val_nZone) {
-  
-#ifndef HAVE_MPI
-  
-  unsigned short iMarker, jMarker;
-  unsigned long iVertex, iPoint, jVertex, jPoint = 0, pPoint = 0, pGlobalPoint = 0;
-  su2double *Coord_i, *Coord_j, dist = 0.0, mindist, maxdist;
-  
-//  if (val_iZone == ZONE_0) cout << "Set zone boundary conditions (if any)." << endl;
-  
-  maxdist = 0.0;
-  for (iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++) {
-    for (iVertex = 0; iVertex < nVertex[iMarker]; iVertex++) {
-      iPoint = vertex[iMarker][iVertex]->GetNode();
-      Coord_i = node[iPoint]->GetCoord();
-      
-      mindist = 1E6;
-      for (jMarker = 0; jMarker < config_donor->GetnMarker_All(); jMarker++)
-        for (jVertex = 0; jVertex < geometry_donor->GetnVertex(jMarker); jVertex++) {
-          jPoint = geometry_donor->vertex[jMarker][jVertex]->GetNode();
-          Coord_j = geometry_donor->node[jPoint]->GetCoord();
-          if (nDim == 2) dist = sqrt(pow(Coord_j[0]-Coord_i[0],2.0) + pow(Coord_j[1]-Coord_i[1],2.0));
-          if (nDim == 3) dist = sqrt(pow(Coord_j[0]-Coord_i[0],2.0) + pow(Coord_j[1]-Coord_i[1],2.0) + pow(Coord_j[2]-Coord_i[2],2.0));
-//          if (dist < mindist) { mindist = dist; pPoint = jPoint; pGlobalPoint = node[jPoint]->GetGlobalIndex();}
-          if (dist < mindist) { mindist = dist; pPoint = jPoint; pGlobalPoint = geometry_donor->node[jPoint]->GetGlobalIndex();}
-        }
-      
-      maxdist = max(maxdist, mindist);
-      vertex[iMarker][iVertex]->SetDonorPoint(pPoint, MASTER_NODE, pGlobalPoint);
-      
-    }
-  }
-  
-#else
-  
-  unsigned short iMarker, iDim;
-  unsigned long iVertex, iPoint, pPoint = 0, jVertex, jPoint, jGlobalPoint = 0, pGlobalPoint = 0;
-  su2double *Coord_i, Coord_j[3], dist = 0.0, mindist, maxdist;
-  int iProcessor, pProcessor = 0;
-  unsigned long nLocalVertex_Zone = 0, nGlobalVertex_Zone = 0, MaxLocalVertex_Zone = 0;
-  int nProcessor = size;
-  
-  unsigned long *Buffer_Send_nVertex = new unsigned long [1];
-  unsigned long *Buffer_Receive_nVertex = new unsigned long [nProcessor];
-  
-//  if (val_iZone == ZONE_0 && rank == MASTER_NODE) cout << "Set zone boundary conditions (if any)." << endl;
-  
-  nLocalVertex_Zone = 0;
-  for (iMarker = 0; iMarker < config_donor->GetnMarker_All(); iMarker++)
-    for (iVertex = 0; iVertex < geometry_donor->GetnVertex(iMarker); iVertex++) {
-      iPoint = geometry_donor->vertex[iMarker][iVertex]->GetNode();
-      if (geometry_donor->node[iPoint]->GetDomain()) nLocalVertex_Zone ++;
-    }
-  
-  Buffer_Send_nVertex[0] = nLocalVertex_Zone;
-  
-  /*--- Send Interface vertex information --*/
-  
-  SU2_MPI::Allreduce(&nLocalVertex_Zone, &nGlobalVertex_Zone, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(&nLocalVertex_Zone, &MaxLocalVertex_Zone, 1, MPI_UNSIGNED_LONG, MPI_MAX, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_nVertex, 1, MPI_UNSIGNED_LONG, Buffer_Receive_nVertex, 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
-  
-  su2double *Buffer_Send_Coord = new su2double [MaxLocalVertex_Zone*nDim];
-  unsigned long *Buffer_Send_Point = new unsigned long [MaxLocalVertex_Zone];
-  unsigned long *Buffer_Send_GlobalPoint = new unsigned long [MaxLocalVertex_Zone];
-  
-  su2double *Buffer_Receive_Coord = new su2double [nProcessor*MaxLocalVertex_Zone*nDim];
-  unsigned long *Buffer_Receive_Point = new unsigned long [nProcessor*MaxLocalVertex_Zone];
-  unsigned long *Buffer_Receive_GlobalPoint = new unsigned long [nProcessor*MaxLocalVertex_Zone];
-  
-  unsigned long nBuffer_Coord = MaxLocalVertex_Zone*nDim;
-  unsigned long nBuffer_Point = MaxLocalVertex_Zone;
-  
-
-  for (iVertex = 0; iVertex < MaxLocalVertex_Zone; iVertex++) {
-    Buffer_Send_Point[iVertex] = 0;
-    Buffer_Send_GlobalPoint[iVertex] = 0;
-    for (iDim = 0; iDim < nDim; iDim++)
-      Buffer_Send_Coord[iVertex*nDim+iDim] = 0.0;
-  }
-  
-  /*--- Copy coordinates and point to the auxiliar vector --*/
-  nLocalVertex_Zone = 0;
-  for (iMarker = 0; iMarker < config_donor->GetnMarker_All(); iMarker++)
-    for (iVertex = 0; iVertex < geometry_donor->GetnVertex(iMarker); iVertex++) {
-      iPoint = geometry_donor->vertex[iMarker][iVertex]->GetNode();
-      if (geometry_donor->node[iPoint]->GetDomain()) {
-        Buffer_Send_Point[nLocalVertex_Zone] = iPoint;
-        Buffer_Send_GlobalPoint[nLocalVertex_Zone] = geometry_donor->node[iPoint]->GetGlobalIndex();
-        for (iDim = 0; iDim < nDim; iDim++)
-          Buffer_Send_Coord[nLocalVertex_Zone*nDim+iDim] = geometry_donor->node[iPoint]->GetCoord(iDim);
-        nLocalVertex_Zone++;
-      }
-    }
-  
-  SU2_MPI::Allgather(Buffer_Send_Coord, nBuffer_Coord, MPI_DOUBLE, Buffer_Receive_Coord, nBuffer_Coord, MPI_DOUBLE, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_Point, nBuffer_Point, MPI_UNSIGNED_LONG, Buffer_Receive_Point, nBuffer_Point, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_GlobalPoint, nBuffer_Point, MPI_UNSIGNED_LONG, Buffer_Receive_GlobalPoint, nBuffer_Point, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
-
-  /*--- Compute the closest point to a Near-Field boundary point ---*/
-  maxdist = 0.0;
-  for (iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++) {
-    for (iVertex = 0; iVertex < nVertex[iMarker]; iVertex++) {
-      iPoint = vertex[iMarker][iVertex]->GetNode();
-      
-      if (node[iPoint]->GetDomain()) {
-        
-        /*--- Coordinates of the boundary point ---*/
-        Coord_i = node[iPoint]->GetCoord(); mindist = 1E6; pProcessor = 0; pPoint = 0;
-        
-        /*--- Loop over all the boundaries to find the pair ---*/
-        for (iProcessor = 0; iProcessor < nProcessor; iProcessor++)
-          for (jVertex = 0; jVertex < Buffer_Receive_nVertex[iProcessor]; jVertex++) {
-            jPoint = Buffer_Receive_Point[iProcessor*MaxLocalVertex_Zone+jVertex];
-            jGlobalPoint = Buffer_Receive_GlobalPoint[iProcessor*MaxLocalVertex_Zone+jVertex];
-
-            /*--- Compute the distance ---*/
-            dist = 0.0; for (iDim = 0; iDim < nDim; iDim++) {
-              Coord_j[iDim] = Buffer_Receive_Coord[(iProcessor*MaxLocalVertex_Zone+jVertex)*nDim+iDim];
-              dist += pow(Coord_j[iDim]-Coord_i[iDim],2.0);
-            } dist = sqrt(dist);
-            
-            if (((dist < mindist) && (iProcessor != rank)) ||
-                ((dist < mindist) && (iProcessor == rank) && (jPoint != iPoint))) {
-              mindist = dist; pProcessor = iProcessor; pPoint = jPoint;
-              pGlobalPoint = jGlobalPoint;
-            }
-          }
-        
-        /*--- Store the value of the pair ---*/
-        maxdist = max(maxdist, mindist);
-        vertex[iMarker][iVertex]->SetDonorPoint(pPoint, pProcessor, pGlobalPoint);
-        
-        
-      }
-    }
-  }
-  
-  delete[] Buffer_Send_Coord;
-  delete[] Buffer_Send_Point;
-  delete[] Buffer_Send_GlobalPoint;
-  
-  delete[] Buffer_Receive_Coord;
-  delete[] Buffer_Receive_Point;
-  delete[] Buffer_Receive_GlobalPoint;
-  
-  delete[] Buffer_Send_nVertex;
-  delete[] Buffer_Receive_nVertex;
-  
-#endif
   
 }
 
@@ -18403,7 +18612,8 @@ void CPhysicalGeometry::SetSensitivity(CConfig *config) {
 
     /*--- Compute (negative) displacements and grab the metadata. ---*/
 
-    fseek(fhw,-(sizeof(int) + 8*sizeof(passivedouble)), SEEK_END);
+    ret = sizeof(int) + 8*sizeof(passivedouble);
+    fseek(fhw,-ret, SEEK_END);
 
     /*--- Read the external iteration. ---*/
 
@@ -18747,6 +18957,164 @@ void CPhysicalGeometry::SetSensitivity(CConfig *config) {
   
   restart_file.close();
 
+  }
+  
+}
+
+void CPhysicalGeometry::ReadUnorderedSensitivity(CConfig *config) {
+  
+  /*--- This routine makes SU2_DOT more interoperable with other
+   packages so that folks can customize their workflows. For example, one
+   may want to compute flow and adjoint with package A, deform the mesh
+   and project the sensitivities with SU2, and control the actual shape
+   parameterization with package C. This routine allows SU2_DOT to read
+   in an additional format for volume sensitivities that looks like:
+    
+    x0, y0, z0, dj/dx, dj/dy, dj/dz
+    x1, y1, z1, dj/dx, dj/dy, dj/dz
+    ...
+    xN, yN, zN, dj/dx, dj/dy, dj/dz
+    
+   with N being the number of grid points. This is a format already used
+   in other packages. Note that the nodes can be in any order in the file. ---*/
+  
+  unsigned short iDim;
+  unsigned long iPoint, pointID;
+  unsigned long unmatched = 0, iPoint_Found = 0, iPoint_Ext = 0;
+
+  su2double Coor_External[3] = {0.0,0.0,0.0}, Sens_External[3] = {0.0,0.0,0.0};
+  su2double dist;
+  int rankID;
+  
+  string filename, text_line;
+  ifstream external_file;
+  ofstream sens_file;
+  
+  if (rank == MASTER_NODE)
+    cout << "Parsing unordered ASCII volume sensitivity file."<< endl;
+  
+  /*--- Allocate space for the sensitivity and initialize. ---*/
+  
+  Sensitivity = new su2double[nPoint*nDim];
+  for (iPoint = 0; iPoint < nPoint; iPoint++) {
+    for (iDim = 0; iDim < nDim; iDim++) {
+      Sensitivity[iPoint*nDim+iDim] = 0.0;
+    }
+  }
+  
+  /*--- Get the filename for the unordered ASCII sensitivity file input. ---*/
+  
+  filename = config->GetDV_Unordered_Sens_Filename();
+  external_file.open(filename.data(), ios::in);
+  if (external_file.fail()) {
+    SU2_MPI::Error(string("There is no unordered ASCII sensitivity file ") +
+                   filename, CURRENT_FUNCTION);
+  }
+  
+  /*--- Allocate the vectors to hold boundary node coordinates
+   and its local ID. ---*/
+  
+  vector<su2double>     Coords(nDim*nPointDomain);
+  vector<unsigned long> PointIDs(nPointDomain);
+  
+  /*--- Retrieve and store the coordinates of owned interior nodes
+   and their local point IDs. ---*/
+  
+  for (iPoint = 0; iPoint < nPointDomain; iPoint++) {
+    PointIDs[iPoint] = iPoint;
+    for (iDim = 0; iDim < nDim; iDim++)
+      Coords[iPoint*nDim + iDim] = node[iPoint]->GetCoord(iDim);
+  }
+  
+  /*--- Build the ADT of all interior nodes. ---*/
+  
+  CADTPointsOnlyClass VertexADT(nDim, nPointDomain,
+                                Coords.data(), PointIDs.data(), true);
+  
+  /*--- Loop over all interior mesh nodes owned by this rank and find the
+   matching point with minimum distance. Once we have the match, store the
+   sensitivities from the file for that node. ---*/
+  
+  if (VertexADT.IsEmpty()) {
+    
+    SU2_MPI::Error("No external points given to ADT.", CURRENT_FUNCTION);
+  
+  } else {
+    
+    /*--- Read the input sensitivity file and locate the point matches
+     using the ADT search, on a line-by-line basis. ---*/
+    
+    iPoint_Found = 0; iPoint_Ext  = 0;
+    while (getline (external_file, text_line)) {
+      
+      /*--- First, check that the line has 6 entries, otherwise throw out. ---*/
+      
+      istringstream point_line(text_line);
+      vector<string> tokens((istream_iterator<string>(point_line)),
+                             istream_iterator<string>());
+      
+      if (tokens.size() == 6) {
+        
+        istringstream point_line(text_line);
+        
+        /*--- Get the coordinates and sensitivity for this line. ---*/
+        
+        for (iDim = 0; iDim < nDim; iDim++) point_line >> Coor_External[iDim];
+        for (iDim = 0; iDim < nDim; iDim++) point_line >> Sens_External[iDim];
+        
+        /*--- Locate the nearest node to this external point. If it is on
+         our rank, then store the sensitivity value. ---*/
+        
+        VertexADT.DetermineNearestNode(&Coor_External[0], dist,
+                                       pointID, rankID);
+        
+        if (rankID == rank) {
+          
+          /*--- Store the sensitivities at the matched local node. ---*/
+          
+          for (iDim = 0; iDim < nDim; iDim++)
+            Sensitivity[pointID*nDim+iDim] = Sens_External[iDim];
+          
+          /*--- Keep track of how many points we match. ---*/
+          
+          iPoint_Found++;
+          
+          /*--- Keep track of points with poor matches for reporting. ---*/
+          
+          if (dist > 1e-10) unmatched++;
+          
+        }
+        
+        /*--- Increment counter for total points in the external file. ---*/
+        
+        iPoint_Ext++;
+        
+      }
+    }
+    
+    /*--- Close the external file. ---*/
+    
+    external_file.close();
+    
+    /*--- We have not received all nodes in the input file. Throw an error. ---*/
+    
+    if ((iPoint_Ext < GetGlobal_nPointDomain()) && (rank == MASTER_NODE)) {
+      sens_file.open(config->GetDV_Unordered_Sens_Filename().data(), ios::out);
+      sens_file.close();
+      SU2_MPI::Error("Not enough points in the input sensitivity file.",
+                     CURRENT_FUNCTION);
+    }
+    
+    /*--- Check for points with a poor match and report the count. ---*/
+    
+    unsigned long myUnmatched = unmatched; unmatched = 0;
+    SU2_MPI::Allreduce(&myUnmatched, &unmatched, 1,
+                       MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+    if ((unmatched > 0) && (rank == MASTER_NODE)) {
+      cout << " Warning: there are " << unmatched;
+      cout << " points with a match distance > 1e-10." << endl;
+    }
+    
   }
   
 }
@@ -20844,8 +21212,24 @@ CMultiGridGeometry::CMultiGridGeometry(CGeometry ****geometry, CConfig **config_
   }
   else {
     if (rank == MASTER_NODE) {
-      if (iMesh == 1) cout <<"MG level: "<< iMesh-1 <<" -> CVs: " << Global_nPointFine << ". Agglomeration rate 1/1.00. CFL "<< config->GetCFL(iMesh-1) <<"." << endl;
-      cout <<"MG level: "<< iMesh <<" -> CVs: " << Global_nPointCoarse << ". Agglomeration rate 1/" << ratio <<". CFL "<< CFL <<"." << endl;
+      PrintingToolbox::CTablePrinter MGTable(&std::cout);
+      MGTable.AddColumn("MG Level", 10);
+      MGTable.AddColumn("CVs", 10);
+      MGTable.AddColumn("Aggl. Rate", 10);
+      MGTable.AddColumn("CFL", 10);
+      MGTable.SetAlign(PrintingToolbox::CTablePrinter::RIGHT);
+      
+      
+      if (iMesh == 1){
+        MGTable.PrintHeader();
+        MGTable << iMesh - 1 << Global_nPointFine << "1/1.00" << config->GetCFL(iMesh -1);
+      }
+      stringstream ss;
+      ss << "1/" << std::setprecision(3) << ratio;
+      MGTable << iMesh << Global_nPointCoarse << ss.str() << CFL;
+      if (iMesh == config->GetnMGLevels()){
+        MGTable.PrintFooter();
+      }
     }
   }
  
