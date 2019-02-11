@@ -623,10 +623,10 @@ void CDiscAdjFEASolver::RegisterVariables(CGeometry *geometry, CConfig *config, 
           for (iVar = 0; iVar < nDV; iVar++) AD::RegisterInput(DV_Val[iVar]);
         }
 
-        geometry->RegisterCoordinates(config);
-
         if (config->GetTopology_Optimization())
           direct_solver->RegisterVariables(geometry,config);
+
+        geometry->RegisterCoordinates(config);
     }
 
   }
@@ -914,8 +914,10 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
 
     }
 
+    if (config->GetTopology_Optimization())
+      direct_solver->ExtractAdjoint_Variables(geometry,config);
+
     /*--- Extract the adjoint values of the grid coordinates ---*/
-    
     su2double *adj_coord = new su2double[nDim];
     for (iPoint = 0; iPoint < nPoint; ++iPoint) {
       geometry->node[iPoint]->GetAdjointCoord(adj_coord);
@@ -924,10 +926,6 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
         node[iPoint]->SetSensitivity(iDim, adj_coord[iDim]);
     }
     delete [] adj_coord;
-
-
-    if (config->GetTopology_Optimization())
-      direct_solver->ExtractAdjoint_Variables(geometry,config);
   }
 
 
