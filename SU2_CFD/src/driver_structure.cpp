@@ -7582,9 +7582,15 @@ bool CDiscAdjFSIDriver::BGSConvergence(unsigned long IntIter,
 void CDiscAdjFSIDriver::Postprocess(unsigned short ZONE_FLOW,
                                              unsigned short ZONE_STRUCT) {
 
-  unsigned short iMarker;
+  bool turbulent = (config_container[ZONE_FLOW]->GetKind_Solver() == DISC_ADJ_RANS);
+  bool frozen_visc = config_container[ZONE_FLOW]->GetFrozen_Visc_Disc();
+
+  unsigned long iPoint, nPoint;
+  unsigned short iVar, nVar, iMarker;
+  su2double *solution = NULL;
 
   /*--- Apply BC's to the structural adjoint after the solution has converged (to avoid unphysical values in clamped nodes) ---*/
+
   for (iMarker = 0; iMarker < config_container[ZONE_STRUCT]->GetnMarker_All(); iMarker++)
   switch (config_container[ZONE_STRUCT]->GetMarker_All_KindBC(iMarker)) {
     case CLAMPED_BOUNDARY:
@@ -7594,6 +7600,51 @@ void CDiscAdjFSIDriver::Postprocess(unsigned short ZONE_FLOW,
     break;
   }
 
+  /*--- Make the adjoint solution consistent with the formulation by accounting for all source terms ---*/
+
+  /*--- Flow adjoints ---*/
+  nPoint = geometry_container[ZONE_FLOW][INST_0][MESH_0]->GetnPoint();
+
+  nVar = solver_container[ZONE_FLOW][INST_0][MESH_0][ADJFLOW_SOL]->GetnVar();
+  solution = new su2double[nVar];
+
+  for (iPoint = 0; iPoint < nPoint; iPoint++) {
+    for (iVar = 0; iVar < nVar; iVar++) {
+      solution[iVar] = solver_container[ZONE_FLOW][INST_0][MESH_0][ADJFLOW_SOL]->node[iPoint]->GetSolution(iVar)+
+          solver_container[ZONE_FLOW][INST_0][MESH_0][ADJFLOW_SOL]->node[iPoint]->GetCross_Term_Derivative(iVar);
+    }
+    solver_container[ZONE_FLOW][INST_0][MESH_0][ADJFLOW_SOL]->node[iPoint]->SetSolution(solution);
+  }
+  delete [] solution;
+
+  if (turbulent && !frozen_visc) {
+    nVar = solver_container[ZONE_FLOW][INST_0][MESH_0][ADJTURB_SOL]->GetnVar();
+    solution = new su2double[nVar];
+
+    for (iPoint = 0; iPoint < nPoint; iPoint++) {
+      for (iVar = 0; iVar < nVar; iVar++) {
+        solution[iVar] = solver_container[ZONE_FLOW][INST_0][MESH_0][ADJTURB_SOL]->node[iPoint]->GetSolution(iVar)+
+            solver_container[ZONE_FLOW][INST_0][MESH_0][ADJTURB_SOL]->node[iPoint]->GetCross_Term_Derivative(iVar);
+      }
+      solver_container[ZONE_FLOW][INST_0][MESH_0][ADJTURB_SOL]->node[iPoint]->SetSolution(solution);
+    }
+    delete [] solution;
+  }
+
+  /*--- Structural adjoints ---*/
+  nPoint = geometry_container[ZONE_STRUCT][INST_0][MESH_0]->GetnPoint();
+
+  nVar = solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->GetnVar();
+  solution = new su2double[nVar];
+
+  for (iPoint = 0; iPoint < nPoint; iPoint++) {
+    for (iVar = 0; iVar < nVar; iVar++) {
+      solution[iVar] = solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->GetSolution(iVar)+
+        solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->GetGeometry_CrossTerm_Derivative(iVar);
+    }
+    solver_container[ZONE_STRUCT][INST_0][MESH_0][ADJFEA_SOL]->node[iPoint]->SetSolution(solution);
+  }
+  delete [] solution;
 
 }
 
