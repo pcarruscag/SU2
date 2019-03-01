@@ -40,11 +40,11 @@
 #include "config_structure.hpp"
 
 #ifdef CODI_REVERSE_TYPE
+template<class ScalarType>
 class CSysSolve_b{
 
 public:
   static void Solve_b(AD::Tape* tape, AD::CheckpointHandler *data);
-  static void Solve_g(AD::Tape* tape, AD::CheckpointHandler *data);
   static void Delete_b(AD::Tape* tape, AD::CheckpointHandler *data);
 };
 #endif
