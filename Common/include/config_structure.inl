@@ -1852,6 +1852,8 @@ inline bool CConfig::GetPseudoStatic(void) { return PseudoStatic; }
 
 inline bool CConfig::GetSteadyRestart(void) { return SteadyRestart; }
 
+inline bool CConfig::GetConsistentRestart(void) const { return ConsistentRestart; }
+
 inline unsigned short CConfig::GetDynamic_Analysis(void) { return Dynamic_Analysis; }
 
 inline su2double CConfig::GetDelta_DynTime(void) { return Delta_DynTime; }

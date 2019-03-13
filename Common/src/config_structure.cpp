@@ -2096,6 +2096,9 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /* DESCRIPTION: Restart from a steady state (sets grid velocities to 0 when loading the restart). */
   addBoolOption("RESTART_STEADY_STATE", SteadyRestart, false);
 
+  /* DESCRIPTION: True assumes the restart file was obtained for the current mesh file. */
+  addBoolOption("CONSISTENT_RESTART", ConsistentRestart, true);
+
   /*!\par CONFIG_CATEGORY: Multizone definition \ingroup Config*/
   /*--- Options related to multizone problems ---*/
 
