@@ -434,7 +434,8 @@ CDriver::CDriver(char* confFile,
 
   }
 
-  if(fsi && (config_container[ZONE_0]->GetRestart() || config_container[ZONE_0]->GetDiscrete_Adjoint())){
+  if((fsi && config_container[ZONE_0]->GetDiscrete_Adjoint()) ||
+     (fsi && config_container[ZONE_0]->GetRestart() && config_container[ZONE_0]->GetConsistentRestart())) {
     if (rank == MASTER_NODE)cout << endl <<"Restarting Fluid and Structural Solvers." << endl;
 
     for (iZone = 0; iZone < nZone; iZone++) {
