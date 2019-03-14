@@ -6951,20 +6951,20 @@ void CDiscAdjFSIDriver::SetRecording(unsigned short ZONE_FLOW,
 
   AD::Reset();
 
-  if (CurrentRecording != kind_recording && (CurrentRecording != NONE) ){
-
-    /*--- Clear indices ---*/
-
-    PrepareRecording(ZONE_FLOW, ZONE_STRUCT, ALL_VARIABLES);
-
-    /*--- Clear indices of coupling variables ---*/
-
-    SetDependencies(ZONE_FLOW, ZONE_STRUCT, ALL_VARIABLES);
-
-    /*--- Run one iteration while tape is passive - this clears all indices ---*/
-    Iterate_Direct(ZONE_FLOW, ZONE_STRUCT, kind_recording);
-
-  }
+//  if (CurrentRecording != kind_recording && (CurrentRecording != NONE) ){
+//
+//    /*--- Clear indices ---*/
+//
+//    PrepareRecording(ZONE_FLOW, ZONE_STRUCT, ALL_VARIABLES);
+//
+//    /*--- Clear indices of coupling variables ---*/
+//
+//    SetDependencies(ZONE_FLOW, ZONE_STRUCT, ALL_VARIABLES);
+//
+//    /*--- Run one iteration while tape is passive - this clears all indices ---*/
+//    Iterate_Direct(ZONE_FLOW, ZONE_STRUCT, kind_recording);
+//
+//  }
 
   /*--- Prepare for recording ---*/
 
