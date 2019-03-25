@@ -11267,7 +11267,7 @@ void COutput::SpecialOutput_FSI(ofstream *FSIHist_file, CGeometry ****geometry, 
 
   if ((rank == MASTER_NODE) && (header)){
 
-    char cstr[200], buffer[50], turb_resid[1000];
+    char cstr[200], buffer[50];// turb_resid[1000];
     string Monitoring_Tag, monitoring_coeff, aeroelastic_coeff, turbo_coeff;
 
     bool turbulent = ((config[ZONE_FLOW]->GetKind_Solver() == RANS) || (config[ZONE_FLOW]->GetKind_Solver() == ADJ_RANS) ||
@@ -11344,7 +11344,7 @@ void COutput::SpecialOutput_FSI(ofstream *FSIHist_file, CGeometry ****geometry, 
 
       case EULER : case NAVIER_STOKES: case RANS :
         FSIHist_file[0] << flow_resid;
-        if (turbulent) FSIHist_file[0] << turb_resid;
+//        if (turbulent) FSIHist_file[0] << turb_resid;
       break;
 
       case DISC_ADJ_EULER: case DISC_ADJ_NAVIER_STOKES: case DISC_ADJ_RANS:
@@ -11372,7 +11372,7 @@ void COutput::SpecialOutput_FSI(ofstream *FSIHist_file, CGeometry ****geometry, 
 
      case EULER : case NAVIER_STOKES: case RANS :
        FSIHist_file[0] << flow_coeff;
-       if (turbulent) FSIHist_file[0] << turb_resid;
+//       if (turbulent) FSIHist_file[0] << turb_resid;
        if (direct_diff != NO_DERIVATIVE) {
          FSIHist_file[0] << d_flow_coeff;
        }
