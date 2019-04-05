@@ -1011,6 +1011,7 @@ void CDiscAdjFEASolver::ExtractAdjoint_CrossTerm_Geometry(CGeometry *geometry, C
   unsigned long iPoint;
   
   su2double relax = config->GetAitkenStatRelax();
+  if (config->GetRelaxation_Method_FSI() == NO_RELAXATION) relax = 1.0;
 
   for (iPoint = 0; iPoint < nPoint; iPoint++){
 
@@ -1020,10 +1021,10 @@ void CDiscAdjFEASolver::ExtractAdjoint_CrossTerm_Geometry(CGeometry *geometry, C
     
     /*--- Relax and set the solution ---*/
     
-    for(iVar = 0; iVar < nVar; iVar++)
+    for(iVar = 0; iVar < nVar; iVar++) {
       Solution[iVar] = relax*Solution[iVar] + (1.0-relax)*node[iPoint]->GetGeometry_CrossTerm_Derivative(iVar);
-
-    for (iVar = 0; iVar < nVar; iVar++) node[iPoint]->SetGeometry_CrossTerm_Derivative(iVar, Solution[iVar]);
+      node[iPoint]->SetGeometry_CrossTerm_Derivative(iVar, Solution[iVar]);
+    }
 
   }
 
@@ -1343,4 +1344,3 @@ void CDiscAdjFEASolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CCo
   Restart_Vars = NULL; Restart_Data = NULL;
 
 }
-

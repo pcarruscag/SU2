@@ -2350,6 +2350,18 @@ public:
 
   virtual su2double GetSolution_Old_Accel(unsigned short iVar);
 
+  /*!
+   * \brief Get (append to vec) the Solution at the node, for use in multi-physics coupling methods.
+   * \param[in,out] vec - on entry values collected so far, on exit values appended for "this" node.
+   */
+  virtual void GetInterfaceValues(vector<passivedouble> &vec);
+
+  /*!
+   * \brief Set the Solution at the node, for use in multi-physics coupling methods.
+   * \param[in,out] it - iterator for source values, on exit is incremented, no change to underlying values.
+   */
+  virtual void SetInterfaceValues(vector<passivedouble>::const_iterator &it);
+
 };
 
 /*!
@@ -2915,6 +2927,12 @@ public:
    * \param[out] val_solution - solution in the previous BGS subiteration.
    */
   su2double Get_BGSSolution_k(unsigned short iDim);
+
+  /*!
+   * \brief Redefined as for the FEA solver the transferred "interface values" is the predicted solution.
+   * \param[in,out] it - iterator to source vector.
+   */
+  void SetInterfaceValues(vector<passivedouble>::const_iterator &it);
 
 };
 
@@ -5002,6 +5020,18 @@ public:
      * \param[out] val_solution - adjoint solution in the previous BGS subiteration.
      */
     su2double Get_BGSSolution_k(unsigned short iDim);
+
+    /*!
+     * \brief Redefined as for the DiscAdjFEA solver "interface values" is the geometry cross term.
+     * \param[in,out] vec - target vector.
+     */
+    void GetInterfaceValues(vector<passivedouble> &vec);
+
+    /*!
+     * \brief Redefined as for the DiscAdjFEA solver "interface values" is the geometry cross term.
+     * \param[in,out] it - iterator to source vector.
+     */
+    void SetInterfaceValues(vector<passivedouble>::const_iterator &it);
 
 };
 
