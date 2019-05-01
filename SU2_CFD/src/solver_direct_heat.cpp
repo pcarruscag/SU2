@@ -2,7 +2,7 @@
  * \file solution_direct_heat.cpp
  * \brief Main subrotuines for solving the heat equation
  * \author F. Palacios, T. Economon
- * \version 6.1.0 "Falcon"
+ * \version 6.2.0 "Falcon"
  *
  * The current SU2 release has been coordinated by the
  * SU2 International Developers Society <www.su2devsociety.org>
@@ -18,7 +18,7 @@
  *  - Prof. Edwin van der Weide's group at the University of Twente.
  *  - Lab. of New Concepts in Aeronautics at Tech. Institute of Aeronautics.
  *
- * Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,
+ * Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,
  *                      Tim Albring, and the SU2 contributors.
  *
  * SU2 is free software; you can redistribute it and/or
@@ -55,7 +55,8 @@ CHeatSolverFVM::CHeatSolverFVM(CGeometry *geometry, CConfig *config, unsigned sh
                || (config->GetKind_Solver() == RANS)
                || (config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES)
                || (config->GetKind_Solver() == DISC_ADJ_RANS));
-  bool heat_equation      = config->GetKind_Solver() == HEAT_EQUATION_FVM;
+  bool heat_equation = ((config->GetKind_Solver() == HEAT_EQUATION_FVM) ||
+                        (config->GetKind_Solver() == DISC_ADJ_HEAT));
 
 #ifdef HAVE_MPI
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -240,7 +241,10 @@ CHeatSolverFVM::CHeatSolverFVM(CGeometry *geometry, CConfig *config, unsigned sh
         node[iPoint] = new CHeatFVMVariable(Temperature_Solid_Freestream_ND, nDim, nVar, config);
 
   /*--- MPI solution ---*/
-  Set_MPI_Solution(geometry, config);
+  
+  InitiateComms(geometry, config, SOLUTION);
+  CompleteComms(geometry, config, SOLUTION);
+  
 }
 
 CHeatSolverFVM::~CHeatSolverFVM(void) { }
@@ -279,7 +283,8 @@ void CHeatSolverFVM::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfi
                || (config->GetKind_Solver() == RANS)
                || (config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES)
                || (config->GetKind_Solver() == DISC_ADJ_RANS));
-  bool heat_equation = config->GetKind_Solver() == HEAT_EQUATION_FVM;
+  bool heat_equation = ((config->GetKind_Solver() == HEAT_EQUATION_FVM) ||
+                        (config->GetKind_Solver() == DISC_ADJ_HEAT));
 
   su2double Area_Children, Area_Parent, *Coord, *Solution_Fine;
   bool dual_time = ((config->GetUnsteady_Simulation() == DT_STEPPING_1ST) ||
@@ -314,18 +319,8 @@ void CHeatSolverFVM::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfi
 
   if (flow) {
 
-    if (config->GetKind_Turb_Model() == SA || config->GetKind_Turb_Model() == SA_NEG) {
-      if (nDim == 2) skipVars += 6;
-      if (nDim == 3) skipVars += 8;
-    }
-    else if (config->GetKind_Turb_Model() == SST ) {
-      if (nDim == 2) skipVars += 7;
-      if (nDim == 3) skipVars += 9;
-    }
-    else {
-      if (nDim == 2) skipVars += 5;
-      if (nDim == 3) skipVars += 7;
-    }
+    if (nDim == 2) skipVars += 5;
+    if (nDim == 3) skipVars += 7;
   }
   else if (heat_equation) {
 
@@ -407,8 +402,10 @@ void CHeatSolverFVM::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfi
    it down to the coarse levels. We alo call the preprocessing routine
    on the fine level in order to have all necessary quantities updated,
    especially if this is a turbulent simulation (eddy viscosity). ---*/
-
-  solver[MESH_0][HEAT_SOL]->Set_MPI_Solution(geometry[MESH_0], config);
+  
+  solver[MESH_0][HEAT_SOL]->InitiateComms(geometry[MESH_0], config, SOLUTION);
+  solver[MESH_0][HEAT_SOL]->CompleteComms(geometry[MESH_0], config, SOLUTION);
+  
   solver[MESH_0][HEAT_SOL]->Preprocessing(geometry[MESH_0], solver[MESH_0], config, MESH_0, NO_RK_ITER, RUNTIME_HEAT_SYS, false);
 
   /*--- Interpolate the solution down to the coarse multigrid levels ---*/
@@ -427,7 +424,8 @@ void CHeatSolverFVM::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfi
       }
       solver[iMesh][HEAT_SOL]->node[iPoint]->SetSolution(Solution);
     }
-    solver[iMesh][HEAT_SOL]->Set_MPI_Solution(geometry[iMesh], config);
+    solver[iMesh][HEAT_SOL]->InitiateComms(geometry[iMesh], config, SOLUTION);
+    solver[iMesh][HEAT_SOL]->CompleteComms(geometry[iMesh], config, SOLUTION);
     solver[iMesh][HEAT_SOL]->Preprocessing(geometry[iMesh], solver[iMesh], config, iMesh, NO_RK_ITER, RUNTIME_HEAT_SYS, false);
   }
 
@@ -487,9 +485,10 @@ void CHeatSolverFVM::SetUndivided_Laplacian(CGeometry *geometry, CConfig *config
   }
 
   /*--- MPI parallelization ---*/
-
-  Set_MPI_Undivided_Laplacian(geometry, config);
-
+  
+  InitiateComms(geometry, config, UNDIVIDED_LAPLACIAN);
+  CompleteComms(geometry, config, UNDIVIDED_LAPLACIAN);
+  
   delete [] Diff;
 
 }
@@ -650,6 +649,10 @@ void CHeatSolverFVM::Upwind_Residual(CGeometry *geometry, CSolver **solver_conta
         V_i = solver_container[FLOW_SOL]->node[iPoint]->GetPrimitive();
         V_j = solver_container[FLOW_SOL]->node[jPoint]->GetPrimitive();
 
+        Temp_i_Grad = node[iPoint]->GetGradient();
+        Temp_j_Grad = node[jPoint]->GetGradient();
+        numerics->SetConsVarGradient(Temp_i_Grad, Temp_j_Grad);
+
         Temp_i = node[iPoint]->GetSolution(0);
         Temp_j = node[jPoint]->GetSolution(0);
 
@@ -727,6 +730,10 @@ void CHeatSolverFVM::Viscous_Residual(CGeometry *geometry, CSolver **solver_cont
                || (config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES)
                || (config->GetKind_Solver() == DISC_ADJ_RANS));
 
+  bool turb = ((config->GetKind_Solver() == RANS) || (config->GetKind_Solver() == DISC_ADJ_RANS));
+
+  eddy_viscosity_i = 0.0;
+  eddy_viscosity_j = 0.0;
   laminar_viscosity = config->GetMu_ConstantND();
   Prandtl_Lam = config->GetPrandtl_Lam();
   Prandtl_Turb = config->GetPrandtl_Turb();
@@ -753,9 +760,10 @@ void CHeatSolverFVM::Viscous_Residual(CGeometry *geometry, CSolver **solver_cont
 
     /*--- Eddy viscosity to compute thermal conductivity ---*/
     if (flow) {
-      eddy_viscosity_i = solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity();
-      eddy_viscosity_j = solver_container[FLOW_SOL]->node[jPoint]->GetEddyViscosity();
-
+      if (turb) {
+        eddy_viscosity_i = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
+        eddy_viscosity_j = solver_container[TURB_SOL]->node[jPoint]->GetmuT();
+      }
       thermal_diffusivity_i = (laminar_viscosity/Prandtl_Lam) + (eddy_viscosity_i/Prandtl_Turb);
       thermal_diffusivity_j = (laminar_viscosity/Prandtl_Lam) + (eddy_viscosity_j/Prandtl_Turb);
     }
@@ -1106,7 +1114,10 @@ void CHeatSolverFVM::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
   unsigned long iVertex, iPoint, Point_Normal;
   su2double *V_outlet, *V_domain;
 
-  bool flow                 = true;
+  bool flow = ((config->GetKind_Solver() == NAVIER_STOKES)
+               || (config->GetKind_Solver() == RANS)
+               || (config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES)
+               || (config->GetKind_Solver() == DISC_ADJ_RANS));
   bool grid_movement        = config->GetGrid_Movement();
   bool implicit             = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
@@ -1118,48 +1129,46 @@ void CHeatSolverFVM::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
 
     if (geometry->node[iPoint]->GetDomain()) {
 
-        Point_Normal = geometry->vertex[val_marker][iVertex]->GetNormal_Neighbor();
+      Point_Normal = geometry->vertex[val_marker][iVertex]->GetNormal_Neighbor();
 
-        /*--- Normal vector for this vertex (negate for outward convention) ---*/
+      /*--- Normal vector for this vertex (negate for outward convention) ---*/
 
-        geometry->vertex[val_marker][iVertex]->GetNormal(Normal);
-        for (iDim = 0; iDim < nDim; iDim++) Normal[iDim] = -Normal[iDim];
+      geometry->vertex[val_marker][iVertex]->GetNormal(Normal);
+      for (iDim = 0; iDim < nDim; iDim++) Normal[iDim] = -Normal[iDim];
 
-        if(flow) {
-            conv_numerics->SetNormal(Normal);
+      if(flow) {
+          conv_numerics->SetNormal(Normal);
 
-            /*--- Retrieve solution at this boundary node ---*/
+          /*--- Retrieve solution at this boundary node ---*/
 
-            V_domain = solver_container[FLOW_SOL]->node[iPoint]->GetPrimitive();
+          V_domain = solver_container[FLOW_SOL]->node[iPoint]->GetPrimitive();
 
-            /*--- Retrieve the specified velocity for the inlet. ---*/
+          /*--- Retrieve the specified velocity for the inlet. ---*/
 
-            V_outlet = solver_container[FLOW_SOL]->GetCharacPrimVar(val_marker, iVertex);
-            for (iDim = 0; iDim < nDim; iDim++)
-              V_outlet[iDim+1] = solver_container[FLOW_SOL]->node[Point_Normal]->GetPrimitive(iDim+1);
+          V_outlet = solver_container[FLOW_SOL]->GetCharacPrimVar(val_marker, iVertex);
+          for (iDim = 0; iDim < nDim; iDim++)
+            V_outlet[iDim+1] = solver_container[FLOW_SOL]->node[Point_Normal]->GetPrimitive(iDim+1);
 
-            conv_numerics->SetPrimitive(V_domain, V_outlet);
+          conv_numerics->SetPrimitive(V_domain, V_outlet);
 
-            if (grid_movement)
-              conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
+          if (grid_movement)
+            conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
 
-            conv_numerics->SetTemperature(node[iPoint]->GetSolution(0), node[Point_Normal]->GetSolution(0));
+          conv_numerics->SetTemperature(node[iPoint]->GetSolution(0), node[Point_Normal]->GetSolution(0));
 
-            /*--- Compute the residual using an upwind scheme ---*/
+          /*--- Compute the residual using an upwind scheme ---*/
 
-            conv_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
+          conv_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
-            /*--- Update residual value ---*/
+          /*--- Update residual value ---*/
 
-            LinSysRes.AddBlock(iPoint, Residual);
+          LinSysRes.AddBlock(iPoint, Residual);
 
-            /*--- Jacobian contribution for implicit integration ---*/
+          /*--- Jacobian contribution for implicit integration ---*/
 
-            if (implicit)
-              Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
-        }
-
-        // viscous contribution is still missing...
+          if (implicit)
+            Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
+      }
     }
   }
 
@@ -1412,10 +1421,12 @@ void CHeatSolverFVM::SetTime_Step(CGeometry *geometry, CSolver **solver_containe
                || (config->GetKind_Solver() == RANS)
                || (config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES)
                || (config->GetKind_Solver() == DISC_ADJ_RANS));
+  bool turb = ((config->GetKind_Solver() == RANS) || (config->GetKind_Solver() == DISC_ADJ_RANS));
   bool dual_time = ((config->GetUnsteady_Simulation() == DT_STEPPING_1ST) ||
                     (config->GetUnsteady_Simulation() == DT_STEPPING_2ND));
   bool implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
+  eddy_viscosity    = 0.0;
   laminar_viscosity = config->GetMu_ConstantND();
   Prandtl_Lam = config->GetPrandtl_Lam();
   Prandtl_Turb = config->GetPrandtl_Turb();
@@ -1460,7 +1471,10 @@ void CHeatSolverFVM::SetTime_Step(CGeometry *geometry, CSolver **solver_containe
 
     thermal_diffusivity = config->GetThermalDiffusivity_Solid();
     if(flow) {
-      eddy_viscosity = solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity();
+      if(turb) {
+        eddy_viscosity = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
+      }
+
       thermal_diffusivity = laminar_viscosity/Prandtl_Lam + eddy_viscosity/Prandtl_Turb;
     }
 
@@ -1497,7 +1511,10 @@ void CHeatSolverFVM::SetTime_Step(CGeometry *geometry, CSolver **solver_containe
 
       thermal_diffusivity = config->GetThermalDiffusivity_Solid();
       if(flow) {
-        eddy_viscosity = solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity();
+        if(turb) {
+          eddy_viscosity = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
+        }
+
         thermal_diffusivity = laminar_viscosity/Prandtl_Lam + eddy_viscosity/Prandtl_Turb;
       }
 
@@ -1527,14 +1544,18 @@ void CHeatSolverFVM::SetTime_Step(CGeometry *geometry, CSolver **solver_containe
 
       /*--- Time step setting method ---*/
 
-      if (config->GetKind_TimeStep_Heat() == MINIMUM)
-        Local_Delta_Time = min(Local_Delta_Time_Inv, Local_Delta_Time_Visc);
-      else if (config->GetKind_TimeStep_Heat() == CONVECTIVE)
-        Local_Delta_Time = Local_Delta_Time_Inv;
-      else if (config->GetKind_TimeStep_Heat() == VISCOUS)
-        Local_Delta_Time = Local_Delta_Time_Visc;
-      else if (config->GetKind_TimeStep_Heat() == BYFLOW)
+      if (config->GetKind_TimeStep_Heat() == BYFLOW && flow) {
         Local_Delta_Time = solver_container[FLOW_SOL]->node[iPoint]->GetDelta_Time();
+      }
+      else if (config->GetKind_TimeStep_Heat() == MINIMUM) {
+        Local_Delta_Time = min(Local_Delta_Time_Inv, Local_Delta_Time_Visc);
+      }
+      else if (config->GetKind_TimeStep_Heat() == CONVECTIVE) {
+        Local_Delta_Time = Local_Delta_Time_Inv;
+      }
+      else if (config->GetKind_TimeStep_Heat() == VISCOUS) {
+        Local_Delta_Time = Local_Delta_Time_Visc;
+      }
 
       /*--- Min-Max-Logic ---*/
 
@@ -1552,7 +1573,7 @@ void CHeatSolverFVM::SetTime_Step(CGeometry *geometry, CSolver **solver_containe
   }
 
   /*--- Compute the max and the min dt (in parallel) ---*/
-  if (config->GetConsole_Output_Verb() == VERB_HIGH) {
+  if (config->GetComm_Level() == COMM_FULL) {
 #ifdef HAVE_MPI
     su2double rbuf_time, sbuf_time;
     sbuf_time = Min_Delta_Time;
@@ -1641,8 +1662,9 @@ void CHeatSolverFVM::ExplicitEuler_Iteration(CGeometry *geometry, CSolver **solv
 
   /*--- MPI solution ---*/
 
-  Set_MPI_Solution(geometry, config);
-
+  InitiateComms(geometry, config, SOLUTION);
+  CompleteComms(geometry, config, SOLUTION);
+  
   /*--- Compute the root mean square residual ---*/
 
   SetResidual_RMS(geometry, config);
@@ -1725,8 +1747,7 @@ void CHeatSolverFVM::ImplicitEuler_Iteration(CGeometry *geometry, CSolver **solv
 
   /*--- Solve or smooth the linear system ---*/
 
-  CSysSolve system;
-  system.Solve(Jacobian, LinSysRes, LinSysSol, geometry, config);
+  System.Solve(Jacobian, LinSysRes, LinSysSol, geometry, config);
 
   for (iPoint = 0; iPoint < nPointDomain; iPoint++) {
     for (iVar = 0; iVar < nVar; iVar++) {
@@ -1736,8 +1757,9 @@ void CHeatSolverFVM::ImplicitEuler_Iteration(CGeometry *geometry, CSolver **solv
 
   /*--- MPI solution ---*/
 
-  Set_MPI_Solution(geometry, config);
-
+  InitiateComms(geometry, config, SOLUTION);
+  CompleteComms(geometry, config, SOLUTION);
+  
   /*--- Compute the root mean square residual ---*/
 
   SetResidual_RMS(geometry, config);
@@ -2039,8 +2061,9 @@ void CHeatSolverFVM::SetInitialCondition(CGeometry **geometry, CSolver ***solver
           }
         }
         solver_container[iMesh][HEAT_SOL]->node[iPoint]->SetSolution(Solution);
-      }
-      solver_container[iMesh][HEAT_SOL]->Set_MPI_Solution(geometry[iMesh], config);
+      }      
+      solver_container[iMesh][HEAT_SOL]->InitiateComms(geometry[iMesh], config, SOLUTION);
+      solver_container[iMesh][HEAT_SOL]->CompleteComms(geometry[iMesh], config, SOLUTION);
     }
     delete [] Solution;
   }

@@ -2,7 +2,7 @@
  * \file output_structure.cpp
  * \brief Main subroutines for output solver information
  * \author F. Palacios, T. Economon
- * \version 6.1.0 "Falcon"
+ * \version 6.2.0 "Falcon"
  *
  * The current SU2 release has been coordinated by the
  * SU2 International Developers Society <www.su2devsociety.org>
@@ -18,7 +18,7 @@
  *  - Prof. Edwin van der Weide's group at the University of Twente.
  *  - Lab. of New Concepts in Aeronautics at Tech. Institute of Aeronautics.
  *
- * Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,
+ * Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,
  *                      Tim Albring, and the SU2 contributors.
  *
  * SU2 is free software; you can redistribute it and/or
@@ -4795,7 +4795,8 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
     *residual_turbulent    = NULL,
     *residual_transition   = NULL;
     su2double *residual_adjflow      = NULL,
-    *residual_adjturbulent = NULL;
+    *residual_adjturbulent = NULL,
+    *residual_adjheat = NULL;
     su2double *residual_fea          = NULL;
     su2double *residual_fem          = NULL;
     su2double *residual_heat         = NULL;
@@ -4818,7 +4819,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
     /*--- Initialize number of variables ---*/
     unsigned short nVar_Flow = 0, nVar_Turb = 0,
     nVar_Trans = 0, nVar_Heat = 0,
-    nVar_AdjFlow = 0, nVar_AdjTurb = 0,
+    nVar_AdjFlow = 0, nVar_AdjTurb = 0, nVar_AdjHeat = 0,
     nVar_FEM = 0;
     
     /*--- Direct problem variables ---*/
@@ -4848,6 +4849,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
         case SST:    nVar_AdjTurb = 2; break;
       }
     }
+    if (weakly_coupled_heat) nVar_AdjHeat = 1;
     
     /*--- Allocate memory for the residual ---*/
     residual_flow       = new su2double[nVar_Flow];
@@ -4858,6 +4860,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
     
     residual_adjflow      = new su2double[nVar_AdjFlow];
     residual_adjturbulent = new su2double[nVar_AdjTurb];
+    residual_adjheat      = new su2double[nVar_AdjHeat];
     
     /*--- Allocate memory for the coefficients being monitored ---*/
     aeroelastic_plunge = new su2double[config[ZONE_0]->GetnMarker_Monitoring()];
@@ -5103,6 +5106,12 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             if (!frozen_visc) {
               for (iVar = 0; iVar < nVar_AdjTurb; iVar++)
                 residual_adjturbulent[iVar] = solver_container[val_iZone][val_iInst][FinestMesh][ADJTURB_SOL]->GetRes_RMS(iVar);
+            }
+          }
+
+          if (weakly_coupled_heat) {
+            for (iVar = 0; iVar < nVar_Heat; iVar++) {
+              residual_adjheat[iVar] = solver_container[val_iZone][val_iInst][FinestMesh][ADJHEAT_SOL]->GetRes_RMS(iVar);
             }
           }
           
@@ -5849,6 +5858,9 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
                   else {cout << "   Res[Psi_Velx]";}}
                 else cout << "     Res[Psi_E]";
               }
+              if (weakly_coupled_heat) {
+                cout << "     Res[Psi_E]";
+              }
               if (disc_adj) {
                 if (!turbo){
                   if (compressible) {
@@ -6256,6 +6268,9 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
                   else {cout.width(15); cout << log10(residual_adjflow[1]);}
                 }
               }
+            if (weakly_coupled_heat) {
+              cout.width(17); cout << log10(residual_adjheat[0]);
+            }
               if (disc_adj) {
                 if (!turbo){
                   if (compressible) {
@@ -6300,7 +6315,8 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
 
     delete [] residual_adjflow;
     delete [] residual_adjturbulent;
-
+    delete [] residual_adjheat;
+    
     delete [] Surface_CL;
     delete [] Surface_CD;
     delete [] Surface_CSF;
@@ -6765,7 +6781,7 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
     
     Breakdown_file << "\n" <<"-------------------------------------------------------------------------" << "\n";
     Breakdown_file <<"|    ___ _   _ ___                                                      |" << "\n";
-    Breakdown_file <<"|   / __| | | |_  )   Release 6.1.0  \"Falcon\"                           |" << "\n";
+    Breakdown_file <<"|   / __| | | |_  )   Release 6.2.0  \"Falcon\"                           |" << "\n";
     Breakdown_file <<"|   \\__ \\ |_| |/ /                                                      |" << "\n";
     Breakdown_file <<"|   |___/\\___//___|   Suite (Computational Fluid Dynamics Code)         |" << "\n";
     Breakdown_file << "|                                                                       |" << "\n";
@@ -6785,7 +6801,7 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
     Breakdown_file << "| - Prof. Edwin van der Weide's group at the University of Twente.      |" << "\n";
     Breakdown_file << "| - Lab. of New Concepts in Aeronautics at Tech. Inst. of Aeronautics.  |" << "\n";
     Breakdown_file <<"-------------------------------------------------------------------------" << "\n";
-    Breakdown_file << "| Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,       |" << "\n";
+    Breakdown_file << "| Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,       |" << "\n";
     Breakdown_file << "|                      Tim Albring, and the SU2 contributors.           |" << "\n";
     Breakdown_file << "|                                                                       |" << "\n";
     Breakdown_file << "| SU2 is free software; you can redistribute it and/or                  |" << "\n";
@@ -6979,6 +6995,20 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
             break;
             
         }
+        
+        if ((Kind_Solver == RANS) || (Kind_Solver == ADJ_RANS) || (Kind_Solver == DISC_ADJ_RANS)) {
+          switch (config[val_iZone]->GetKind_ConductivityModel_Turb()) {
+            case CONSTANT_PRANDTL_TURB:
+              Breakdown_file << "Turbulent Conductivity Model: CONSTANT_PRANDTL_TURB  "<< "\n";
+              Breakdown_file << "Turbulent Prandtl: " << config[val_iZone]->GetPrandtl_Turb()<< "\n";
+              break;
+            case NO_CONDUCTIVITY_TURB:
+              Breakdown_file << "Turbulent Conductivity Model: NO_CONDUCTIVITY_TURB "<< "\n";
+              Breakdown_file << "No turbulent component in effective thermal conductivity." << "\n";
+              break;
+          }
+        }
+        
       }
     }
     
@@ -7241,6 +7271,30 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
           if (config[val_iZone]->GetSystemMeasurements() == SI) Breakdown_file << " Pa." << endl;
           else if (config[val_iZone]->GetSystemMeasurements() == US) Breakdown_file << " psf." << endl;
           break;
+          
+        case INC_IDEAL_GAS_POLY:
+          Breakdown_file << "Fluid Model: INC_IDEAL_GAS_POLY "<< endl;
+          Breakdown_file << "Variable density incompressible flow using ideal gas law." << endl;
+          Breakdown_file << "Density is a function of temperature (constant thermodynamic pressure)." << endl;
+          Breakdown_file << "Molecular weight: " << config[val_iZone]->GetMolecular_Weight() << " g/mol." << endl;
+          Breakdown_file << "Specific gas constant: " << config[val_iZone]->GetGas_Constant() << " N.m/kg.K." << endl;
+          Breakdown_file << "Specific gas constant (non-dim): " << config[val_iZone]->GetGas_ConstantND() << endl;
+          Breakdown_file << "Thermodynamic pressure: " << config[val_iZone]->GetPressure_Thermodynamic();
+          if (config[val_iZone]->GetSystemMeasurements() == SI) Breakdown_file << " Pa." << endl;
+          else if (config[val_iZone]->GetSystemMeasurements() == US) Breakdown_file << " psf." << endl;
+          Breakdown_file << "Cp(T) polynomial coefficients: \n  (";
+          for (unsigned short iVar = 0; iVar < config[val_iZone]->GetnPolyCoeffs(); iVar++) {
+            Breakdown_file << config[val_iZone]->GetCp_PolyCoeff(iVar);
+            if (iVar < config[val_iZone]->GetnPolyCoeffs()-1) Breakdown_file << ", ";
+          }
+          Breakdown_file << ")." << endl;
+          Breakdown_file << "Cp(T) polynomial coefficients (non-dim.): \n  (";
+          for (unsigned short iVar = 0; iVar < config[val_iZone]->GetnPolyCoeffs(); iVar++) {
+            Breakdown_file << config[val_iZone]->GetCp_PolyCoeffND(iVar);
+            if (iVar < config[val_iZone]->GetnPolyCoeffs()-1) Breakdown_file << ", ";
+          }
+          Breakdown_file << ")." << endl;
+          break;
 
       }
       if (viscous) {
@@ -7269,6 +7323,22 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
             Breakdown_file << "Ref. Temperature (non-dim): " << config[val_iZone]->GetMu_Temperature_RefND()<< "\n";
             Breakdown_file << "Sutherland constant (non-dim): "<< config[val_iZone]->GetMu_SND()<< "\n";
             break;
+            
+          case POLYNOMIAL_VISCOSITY:
+            Breakdown_file << "Viscosity Model: POLYNOMIAL_VISCOSITY  "<< endl;
+            Breakdown_file << "Mu(T) polynomial coefficients: \n  (";
+            for (unsigned short iVar = 0; iVar < config[val_iZone]->GetnPolyCoeffs(); iVar++) {
+              Breakdown_file << config[val_iZone]->GetMu_PolyCoeff(iVar);
+              if (iVar < config[val_iZone]->GetnPolyCoeffs()-1) Breakdown_file << ", ";
+            }
+            Breakdown_file << ")." << endl;
+            Breakdown_file << "Mu(T) polynomial coefficients (non-dim.): \n  (";
+            for (unsigned short iVar = 0; iVar < config[val_iZone]->GetnPolyCoeffs(); iVar++) {
+              Breakdown_file << config[val_iZone]->GetMu_PolyCoeffND(iVar);
+              if (iVar < config[val_iZone]->GetnPolyCoeffs()-1) Breakdown_file << ", ";
+            }
+            Breakdown_file << ")." << endl;
+            break;
 
         }
 
@@ -7278,7 +7348,6 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
             case CONSTANT_PRANDTL:
               Breakdown_file << "Conductivity Model: CONSTANT_PRANDTL  "<< "\n";
               Breakdown_file << "Prandtl (Laminar): " << config[val_iZone]->GetPrandtl_Lam()<< "\n";
-              Breakdown_file << "Prandtl (Turbulent): " << config[val_iZone]->GetPrandtl_Turb()<< "\n";
               break;
 
             case CONSTANT_CONDUCTIVITY:
@@ -7287,7 +7356,37 @@ void COutput::SpecialOutput_ForcesBreakdown(CSolver *****solver, CGeometry ****g
               Breakdown_file << "Molecular Conductivity (non-dim): " << config[val_iZone]->GetKt_ConstantND()<< "\n";
               break;
 
+            case POLYNOMIAL_CONDUCTIVITY:
+              Breakdown_file << "Viscosity Model: POLYNOMIAL_CONDUCTIVITY "<< endl;
+              Breakdown_file << "Kt(T) polynomial coefficients: \n  (";
+              for (unsigned short iVar = 0; iVar < config[val_iZone]->GetnPolyCoeffs(); iVar++) {
+                Breakdown_file << config[val_iZone]->GetKt_PolyCoeff(iVar);
+                if (iVar < config[val_iZone]->GetnPolyCoeffs()-1) Breakdown_file << ", ";
+              }
+              Breakdown_file << ")." << endl;
+              Breakdown_file << "Kt(T) polynomial coefficients (non-dim.): \n  (";
+              for (unsigned short iVar = 0; iVar < config[val_iZone]->GetnPolyCoeffs(); iVar++) {
+                Breakdown_file << config[val_iZone]->GetKt_PolyCoeffND(iVar);
+                if (iVar < config[val_iZone]->GetnPolyCoeffs()-1) Breakdown_file << ", ";
+              }
+              Breakdown_file << ")." << endl;
+              break;
+              
           }
+          
+          if ((Kind_Solver == RANS) || (Kind_Solver == ADJ_RANS) || (Kind_Solver == DISC_ADJ_RANS)) {
+            switch (config[val_iZone]->GetKind_ConductivityModel_Turb()) {
+              case CONSTANT_PRANDTL_TURB:
+                Breakdown_file << "Turbulent Conductivity Model: CONSTANT_PRANDTL_TURB  "<< "\n";
+                Breakdown_file << "Turbulent Prandtl: " << config[val_iZone]->GetPrandtl_Turb()<< "\n";
+                break;
+              case NO_CONDUCTIVITY_TURB:
+                Breakdown_file << "Turbulent Conductivity Model: NO_CONDUCTIVITY_TURB "<< "\n";
+                Breakdown_file << "No turbulent component in effective thermal conductivity." << "\n";
+                break;
+            }
+          }
+          
         }
 
       }
@@ -8532,8 +8631,13 @@ void COutput::SetBaselineResult_Files(CSolver ***solver, CGeometry ***geometry, 
           default:
             break;
           }
+          
         }
-
+        
+        if (config[iZone]->GetWrt_Projected_Sensitivity()) {
+          WriteProjectedSensitivity(config[iZone], geometry[iZone][iInst], iZone, val_nZone);
+        }
+        
         if (FileFormat == TECPLOT_BINARY) {
           if (!wrote_base_file)
             DeallocateConnectivity(config[iZone], geometry[iZone][iInst], false);
@@ -11509,12 +11613,20 @@ void COutput::SetSensitivity_Files(CGeometry ***geometry, CConfig **config, unsi
 
     for (iMarker = 0; iMarker < nMarker; iMarker++) {
 
+<<<<<<< HEAD
       if((config[iZone]->GetMarker_All_KindBC(iMarker) == HEAT_FLUX )   ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == EULER_WALL )  ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == ISOTHERMAL )  ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == CHT_WALL_INTERFACE ) ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == CLAMPED_BOUNDARY ) ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == LOAD_BOUNDARY )) {
+=======
+      if((config[iZone]->GetMarker_All_KindBC(iMarker) == HEAT_FLUX ) ||
+         (config[iZone]->GetMarker_All_KindBC(iMarker) == EULER_WALL ) ||
+         (config[iZone]->GetMarker_All_KindBC(iMarker) == ISOTHERMAL ) ||
+         (config[iZone]->GetMarker_All_KindBC(iMarker) == CHT_WALL_INTERFACE )) {
+
+>>>>>>> develop
         
         nVertex = geometry[iZone][INST_0]->GetnVertex(iMarker);
 
@@ -12215,11 +12327,11 @@ void COutput::SetResult_Files_Parallel(CSolver *****solver_container,
 
 #ifdef HAVE_MPI
       /*--- Do not merge the connectivity or write the visualization files
-     if we are running in parallel, unless we are using ParaView binary.
+       if we are running in parallel, unless we are using ParaView or Tecplot binary.
        Force the use of SU2_SOL to merge and write the viz. files in this
        case to save overhead. ---*/
 
-      if ((size > SINGLE_NODE) && (FileFormat != PARAVIEW_BINARY)) {
+      if ((size > SINGLE_NODE) && (FileFormat != PARAVIEW_BINARY) && (FileFormat != TECPLOT_BINARY)) {
         Wrt_Vol = false;
         Wrt_Srf = false;
       }
@@ -12376,8 +12488,10 @@ void COutput::SetResult_Files_Parallel(CSolver *****solver_container,
 
       if (fem_solver)
         SortConnectivity_FEM(config[iZone], geometry[iZone][iInst][MESH_0], iZone);
+      else if (FileFormat == TECPLOT_BINARY)
+        SortConnectivity(config[iZone], geometry[iZone][iInst][MESH_0], iZone, false);
       else
-        SortConnectivity(config[iZone], geometry[iZone][iInst][MESH_0], iZone);
+        SortConnectivity(config[iZone], geometry[iZone][iInst][MESH_0], iZone, true);
 
       /*--- Sort the surface data and renumber if for writing. ---*/
       if (Wrt_Srf){
@@ -12414,11 +12528,9 @@ void COutput::SetResult_Files_Parallel(CSolver *****solver_container,
 
             /*--- Write a Tecplot ASCII file instead for now in serial. ---*/
 
-            if (rank == MASTER_NODE) cout << "Tecplot binary volume files not available in serial with SU2_CFD." << endl;
-            if (rank == MASTER_NODE) cout << "  Run SU2_SOL to generate Tecplot binary." << endl;
-            if (rank == MASTER_NODE) cout << "Writing Tecplot ASCII file volume solution file instead." << endl;
-            WriteTecplotASCII_Parallel(config[iZone], geometry[iZone][iInst][MESH_0],
-                solver_container[iZone][iInst][MESH_0], iZone, val_nZone, iInst, nInst, false);
+            if (rank == MASTER_NODE) cout << "Writing Tecplot binary volume solution file." << endl;
+            WriteTecplotBinary_Parallel(config[iZone], geometry[iZone][iInst][MESH_0],
+                iZone, val_nZone, false);
             break;
 
           case FIELDVIEW_BINARY:
@@ -12468,13 +12580,11 @@ void COutput::SetResult_Files_Parallel(CSolver *****solver_container,
 
           case TECPLOT_BINARY:
 
-            /*--- Write a Tecplot ASCII file instead for now in serial. ---*/
+            /*--- Write a Tecplot binary file ---*/
 
-            if (rank == MASTER_NODE) cout << "Tecplot binary surface files not available in serial with SU2_CFD." << endl;
-            if (rank == MASTER_NODE) cout << "  Run SU2_SOL to generate Tecplot binary." << endl;
-            if (rank == MASTER_NODE) cout << "Writing Tecplot ASCII file surface solution file instead." << endl;
-            WriteTecplotASCII_Parallel(config[iZone], geometry[iZone][iInst][MESH_0],
-                solver_container[iZone][iInst][MESH_0], iZone, val_nZone, iInst, nInst, true);
+            if (rank == MASTER_NODE) cout << "Writing Tecplot binary surface solution file." << endl;
+            WriteTecplotBinary_Parallel(config[iZone], geometry[iZone][iInst][MESH_0],
+                iZone, val_nZone, true);
             break;
 
           case PARAVIEW:
@@ -12544,6 +12654,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
   
   bool transition           = (config->GetKind_Trans_Model() == BC);
   bool grid_movement        = (config->GetGrid_Movement());
+  bool rotating_frame       = config->GetRotating_Frame();
   bool Wrt_Halo             = config->GetWrt_Halo(), isPeriodic;
   
   int *Local_Halo = NULL;
@@ -12774,6 +12885,27 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
     }
     
     /*--- New variables get registered here before the end of the loop. ---*/
+    
+    if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+      nVar_Par += 2;
+      Variable_Names.push_back("Vorticity_x");
+      Variable_Names.push_back("Vorticity_y");
+      if (geometry->GetnDim() == 3) {
+        nVar_Par += 1; Variable_Names.push_back("Vorticity_z");
+      }
+      
+      nVar_Par +=1;
+      Variable_Names.push_back("Q_Criterion");
+    }
+    
+    if (rotating_frame) {
+      nVar_Par += 2;
+      Variable_Names.push_back("Relative_Velocity_x");
+      Variable_Names.push_back("Relative_Velocity_y");
+      if (geometry->GetnDim() == 3) {
+        nVar_Par += 1; Variable_Names.push_back("Relative_Velocity_z");
+      }
+    }
     
   }
   
@@ -13007,6 +13139,51 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
         
         /*--- New variables can be loaded to the Local_Data structure here,
          assuming they were registered above correctly. ---*/
+
+        if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetVorticity()[0]; iVar++;
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetVorticity()[1]; iVar++;
+          if (geometry->GetnDim() == 3) {
+            Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetVorticity()[2];
+            iVar++;
+          }
+          
+          su2double Grad_Vel[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+          su2double Omega[3][3]    = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+          su2double Strain[3][3]   = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+          for (iDim = 0; iDim < nDim; iDim++) {
+            for (unsigned short jDim = 0 ; jDim < nDim; jDim++) {
+              Grad_Vel[iDim][jDim] = solver[FLOW_SOL]->node[iPoint]->GetGradient_Primitive(iDim+1, jDim);
+              Strain[iDim][jDim]   = 0.5*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
+              Omega[iDim][jDim]    = 0.5*(Grad_Vel[iDim][jDim] - Grad_Vel[jDim][iDim]);
+            }
+          }
+          
+          su2double OmegaMag = 0.0, StrainMag = 0.0;
+          for (iDim = 0; iDim < nDim; iDim++) {
+            for (unsigned short jDim = 0 ; jDim < nDim; jDim++) {
+              StrainMag += Strain[iDim][jDim]*Strain[iDim][jDim];
+              OmegaMag  += Omega[iDim][jDim]*Omega[iDim][jDim];
+            }
+          }
+          StrainMag   = sqrt(StrainMag);
+          OmegaMag    = sqrt(OmegaMag);
+          su2double Q = 0.5*(OmegaMag - StrainMag);
+          Local_Data[jPoint][iVar] = Q; iVar++;
+        }
+        
+        /*--- For rotating frame problems, compute the relative velocity. ---*/
+        
+        if (rotating_frame) {
+          Grid_Vel = geometry->node[iPoint]->GetGridVel();
+          su2double *Solution = solver[FLOW_SOL]->node[iPoint]->GetSolution();
+          Local_Data[jPoint][iVar] = Solution[1]/Solution[0] - Grid_Vel[0]; iVar++;
+          Local_Data[jPoint][iVar] = Solution[2]/Solution[0] - Grid_Vel[1]; iVar++;
+          if (geometry->GetnDim() == 3) {
+            Local_Data[jPoint][iVar] = Solution[3]/Solution[0] - Grid_Vel[2];
+            iVar++;
+          }
+        }
         
       }
       
@@ -13056,7 +13233,10 @@ void COutput::LoadLocalData_IncFlow(CConfig *config, CGeometry *geometry, CSolve
   bool variable_density     = (config->GetKind_DensityModel() == VARIABLE);
   bool energy               = config->GetEnergy_Equation();
   bool weakly_coupled_heat  = config->GetWeakly_Coupled_Heat();
-
+  bool wrt_cp           = (variable_density &&
+                           (config->GetKind_FluidModel() == INC_IDEAL_GAS_POLY));
+  bool wrt_kt           = ((config->GetKind_ConductivityModel() != CONSTANT_CONDUCTIVITY) &&
+                           (config->GetViscous()));
   int *Local_Halo = NULL;
 
   stringstream varname;
@@ -13278,13 +13458,33 @@ void COutput::LoadLocalData_IncFlow(CConfig *config, CGeometry *geometry, CSolve
       }
     }
 
-    /*--- New variables get registered here before the end of the loop. ---*/
-
     if (variable_density) {
       nVar_Par += 1;
       Variable_Names.push_back("Density");
     }
     
+    if (wrt_cp) {
+      nVar_Par += 1;
+      Variable_Names.push_back("Specific_Heat");
+    }
+    
+    if (wrt_kt) {
+      nVar_Par += 1;
+      Variable_Names.push_back("Thermal_Conductivity");
+    }
+    
+    if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+      nVar_Par += 2;
+      Variable_Names.push_back("Vorticity_x");
+      Variable_Names.push_back("Vorticity_y");
+        nVar_Par += 1; Variable_Names.push_back("Vorticity_z");
+      
+      nVar_Par +=1;
+      Variable_Names.push_back("Q_Criterion");
+    }
+    
+    /*--- New variables get registered here before the end of the loop. ---*/
+
   }
 
   /*--- Auxiliary vectors for variables defined on surfaces only. ---*/
@@ -13510,8 +13710,48 @@ void COutput::LoadLocalData_IncFlow(CConfig *config, CGeometry *geometry, CSolve
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetDensity(); iVar++;
         }
         
+        /*--- Load Cp and conductivity if they are temperature-dependent. ---*/
+        if (wrt_cp) {
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetSpecificHeatCp(); iVar++;
+        }
+        
+        if (wrt_kt) {
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetThermalConductivity(); iVar++;
+        }
+        
         /*--- New variables can be loaded to the Local_Data structure here,
          assuming they were registered above correctly. ---*/
+
+        if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+          
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetVorticity()[0]; iVar++;
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetVorticity()[1]; iVar++;
+          Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetVorticity()[2]; iVar++;
+          
+          su2double Grad_Vel[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+          su2double Omega[3][3]    = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+          su2double Strain[3][3]   = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}};
+          for (iDim = 0; iDim < nDim; iDim++) {
+            for (unsigned short jDim = 0 ; jDim < nDim; jDim++) {
+              Grad_Vel[iDim][jDim] = solver[FLOW_SOL]->node[iPoint]->GetGradient_Primitive(iDim+1, jDim);
+              Strain[iDim][jDim]   = 0.5*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
+              Omega[iDim][jDim]    = 0.5*(Grad_Vel[iDim][jDim] - Grad_Vel[jDim][iDim]);
+            }
+          }
+          
+          su2double OmegaMag = 0.0, StrainMag = 0.0;
+          for (iDim = 0; iDim < nDim; iDim++) {
+            for (unsigned short jDim = 0 ; jDim < nDim; jDim++) {
+              StrainMag += Strain[iDim][jDim]*Strain[iDim][jDim];
+              OmegaMag  += Omega[iDim][jDim]*Omega[iDim][jDim];
+            }
+          }
+          StrainMag = sqrt(StrainMag); OmegaMag = sqrt(OmegaMag);
+          
+          su2double Q = 0.5*(OmegaMag - StrainMag);
+          Local_Data[jPoint][iVar] = Q; iVar++;
+          
+        }
 
       }
 
@@ -14409,7 +14649,7 @@ void COutput::LoadLocalData_Base(CConfig *config, CGeometry *geometry, CSolver *
   
 }
 
-void COutput::SortConnectivity(CConfig *config, CGeometry *geometry, unsigned short val_iZone) {
+void COutput::SortConnectivity(CConfig *config, CGeometry *geometry, unsigned short val_iZone, bool val_sort) {
 
   /*--- Flags identifying the types of files to be written. ---*/
   
@@ -14427,12 +14667,12 @@ void COutput::SortConnectivity(CConfig *config, CGeometry *geometry, unsigned sh
     if ((rank == MASTER_NODE) && (size != SINGLE_NODE))
       cout <<"Sorting volumetric grid connectivity." << endl;
     
-    SortVolumetricConnectivity(config, geometry, TRIANGLE     );
-    SortVolumetricConnectivity(config, geometry, QUADRILATERAL);
-    SortVolumetricConnectivity(config, geometry, TETRAHEDRON  );
-    SortVolumetricConnectivity(config, geometry, HEXAHEDRON   );
-    SortVolumetricConnectivity(config, geometry, PRISM        );
-    SortVolumetricConnectivity(config, geometry, PYRAMID      );
+    SortVolumetricConnectivity(config, geometry, TRIANGLE,      val_sort);
+    SortVolumetricConnectivity(config, geometry, QUADRILATERAL, val_sort);
+    SortVolumetricConnectivity(config, geometry, TETRAHEDRON,   val_sort);
+    SortVolumetricConnectivity(config, geometry, HEXAHEDRON,    val_sort);
+    SortVolumetricConnectivity(config, geometry, PRISM,         val_sort);
+    SortVolumetricConnectivity(config, geometry, PYRAMID,       val_sort);
     
   }
   
@@ -14463,7 +14703,10 @@ void COutput::SortConnectivity(CConfig *config, CGeometry *geometry, unsigned sh
   
 }
 
-void COutput::SortVolumetricConnectivity(CConfig *config, CGeometry *geometry, unsigned short Elem_Type) {
+void COutput::SortVolumetricConnectivity(CConfig *config,
+                                         CGeometry *geometry,
+                                         unsigned short Elem_Type,
+                                         bool val_sort) {
   
   unsigned long iProcessor;
   unsigned short NODES_PER_ELEMENT = 0;
@@ -14730,15 +14973,23 @@ void COutput::SortVolumetricConnectivity(CConfig *config, CGeometry *geometry, u
           if (newID < Global_Index) Global_Index = newID;
         }
         
-        /*--- Search for the processor that owns this point ---*/
+        /*--- Search for the processor that owns this point. If we are
+         sorting the elements, we use the linear partitioning to find
+         the rank, otherwise, we simply have the current rank load its
+         own elements into the connectivity data structure. ---*/
         
-        iProcessor = Global_Index/npoint_procs[0];
-        if (iProcessor >= (unsigned long)size)
-          iProcessor = (unsigned long)size-1;
-        if (Global_Index >= nPoint_Linear[iProcessor])
-          while(Global_Index >= nPoint_Linear[iProcessor+1]) iProcessor++;
-        else
-          while(Global_Index <  nPoint_Linear[iProcessor])   iProcessor--;
+        if (val_sort) {
+          iProcessor = Global_Index/npoint_procs[0];
+          if (iProcessor >= (unsigned long)size)
+            iProcessor = (unsigned long)size-1;
+          if (Global_Index >= nPoint_Linear[iProcessor])
+            while(Global_Index >= nPoint_Linear[iProcessor+1]) iProcessor++;
+          else
+            while(Global_Index <  nPoint_Linear[iProcessor])   iProcessor--;
+        } else {
+          iProcessor = rank;
+        }
+
         
         /*--- If we have not visited this element yet, increment our
          number of elements that must be sent to a particular proc. ---*/
@@ -14823,17 +15074,24 @@ void COutput::SortVolumetricConnectivity(CConfig *config, CGeometry *geometry, u
           unsigned long newID = geometry->node[jPoint]->GetGlobalIndex();
           if (newID < Global_Index) Global_Index = newID;
         }
+       
+        /*--- Search for the processor that owns this point. If we are
+         sorting the elements, we use the linear partitioning to find
+         the rank, otherwise, we simply have the current rank load its
+         own elements into the connectivity data structure. ---*/
         
-        /*--- Search for the processor that owns this point ---*/
-        
-        iProcessor = Global_Index/npoint_procs[0];
-        if (iProcessor >= (unsigned long)size)
-          iProcessor = (unsigned long)size-1;
-        if (Global_Index >= nPoint_Linear[iProcessor])
-          while(Global_Index >= nPoint_Linear[iProcessor+1]) iProcessor++;
-        else
-          while(Global_Index <  nPoint_Linear[iProcessor])   iProcessor--;
-        
+        if (val_sort) {
+          iProcessor = Global_Index/npoint_procs[0];
+          if (iProcessor >= (unsigned long)size)
+            iProcessor = (unsigned long)size-1;
+          if (Global_Index >= nPoint_Linear[iProcessor])
+            while(Global_Index >= nPoint_Linear[iProcessor+1]) iProcessor++;
+          else
+            while(Global_Index <  nPoint_Linear[iProcessor])   iProcessor--;
+        } else {
+          iProcessor = rank;
+        }
+
         /*--- Load connectivity into the buffer for sending ---*/
         
         if (nElem_Flag[iProcessor] != ii) {
@@ -17572,7 +17830,12 @@ void COutput::WriteRestart_Parallel_ASCII(CConfig *config, CGeometry *geometry, 
     restart_file <<"DCMX_DCL_VALUE= " << config->GetdCMx_dCL() << endl;
     restart_file <<"DCMY_DCL_VALUE= " << config->GetdCMy_dCL() << endl;
     restart_file <<"DCMZ_DCL_VALUE= " << config->GetdCMz_dCL() << endl;
-    if (adjoint) restart_file << "SENS_AOA=" << solver[ADJFLOW_SOL]->GetTotal_Sens_AoA() * PI_NUMBER / 180.0 << endl;
+
+    if (( config->GetKind_Solver() == DISC_ADJ_EULER ||
+          config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES ||
+          config->GetKind_Solver() == DISC_ADJ_RANS ) && adjoint) {
+      restart_file << "SENS_AOA=" << solver[ADJFLOW_SOL]->GetTotal_Sens_AoA() * PI_NUMBER / 180.0 << endl;
+    }
   }
 
   /*--- All processors close the file. ---*/
@@ -17667,7 +17930,11 @@ void COutput::WriteRestart_Parallel_Binary(CConfig *config, CGeometry *geometry,
     0.0
   };
 
-  if (adjoint) Restart_Metadata[4] = SU2_TYPE::GetValue(solver[ADJFLOW_SOL]->GetTotal_Sens_AoA() * PI_NUMBER / 180.0);
+  if (( config->GetKind_Solver() == DISC_ADJ_EULER ||
+        config->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES ||
+        config->GetKind_Solver() == DISC_ADJ_RANS ) && adjoint) {
+    Restart_Metadata[4] = SU2_TYPE::GetValue(solver[ADJFLOW_SOL]->GetTotal_Sens_AoA() * PI_NUMBER / 180.0);
+  }
 
   /*--- Set a timer for the binary file writing. ---*/
   
@@ -17779,7 +18046,7 @@ void COutput::WriteRestart_Parallel_Binary(CConfig *config, CGeometry *geometry,
 
     for (iVar = 0; iVar < nVar_Par; iVar++) {
       disp = var_buf_size*sizeof(int) + iVar*CGNS_STRING_SIZE*sizeof(char);
-      strcpy(str_buf, Variable_Names[iVar].c_str());
+      strncpy(str_buf, Variable_Names[iVar].c_str(), CGNS_STRING_SIZE);
       MPI_File_write_at(fhw, disp, str_buf, CGNS_STRING_SIZE, MPI_CHAR, MPI_STATUS_IGNORE);
       file_size += (su2double)CGNS_STRING_SIZE*sizeof(char);
     }
@@ -18818,21 +19085,21 @@ void COutput::SpecialOutput_AnalyzeSurface(CSolver *solver, CGeometry *geometry,
   }
   
 #ifdef HAVE_MPI
-  
-  SU2_MPI::Allreduce(Surface_MassFlow_Local, Surface_MassFlow_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_Mach_Local, Surface_Mach_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_Temperature_Local, Surface_Temperature_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_Density_Local, Surface_Density_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_Enthalpy_Local, Surface_Enthalpy_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_NormalVelocity_Local, Surface_NormalVelocity_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_StreamVelocity2_Local, Surface_StreamVelocity2_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_TransvVelocity2_Local, Surface_TransvVelocity2_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_Pressure_Local, Surface_Pressure_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_TotalTemperature_Local, Surface_TotalTemperature_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_TotalPressure_Local, Surface_TotalPressure_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_Area_Local, Surface_Area_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(Surface_MassFlow_Abs_Local, Surface_MassFlow_Abs_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
+  if (config->GetComm_Level() == COMM_FULL) {
+    SU2_MPI::Allreduce(Surface_MassFlow_Local, Surface_MassFlow_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_Mach_Local, Surface_Mach_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_Temperature_Local, Surface_Temperature_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_Density_Local, Surface_Density_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_Enthalpy_Local, Surface_Enthalpy_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_NormalVelocity_Local, Surface_NormalVelocity_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_StreamVelocity2_Local, Surface_StreamVelocity2_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_TransvVelocity2_Local, Surface_TransvVelocity2_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_Pressure_Local, Surface_Pressure_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_TotalTemperature_Local, Surface_TotalTemperature_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_TotalPressure_Local, Surface_TotalPressure_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_Area_Local, Surface_Area_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(Surface_MassFlow_Abs_Local, Surface_MassFlow_Abs_Total, nMarker_Analyze, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  }
 #else
   
   for (iMarker_Analyze = 0; iMarker_Analyze < nMarker_Analyze; iMarker_Analyze++) {
