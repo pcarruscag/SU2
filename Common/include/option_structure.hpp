@@ -2,7 +2,7 @@
  * \file option_structure.hpp
  * \brief Defines classes for referencing options for easy input in CConfig
  * \author J. Hicken, B. Tracey
- * \version 6.2.0 "Falcon"
+ * \version 6.1.0 "Falcon"
  *
  * The current SU2 release has been coordinated by the
  * SU2 International Developers Society <www.su2devsociety.org>
@@ -18,7 +18,7 @@
  *  - Prof. Edwin van der Weide's group at the University of Twente.
  *  - Lab. of New Concepts in Aeronautics at Tech. Institute of Aeronautics.
  *
- * Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,
+ * Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,
  *                      Tim Albring, and the SU2 contributors.
  *
  * SU2 is free software; you can redistribute it and/or
@@ -115,7 +115,7 @@ const unsigned int BUFSIZE = 3000000;		     /*!< \brief MPI buffer. */
 const unsigned int MAX_PARAMETERS = 10;		   /*!< \brief Maximum number of parameters for a design variable definition. */
 const unsigned int MAX_NUMBER_PERIODIC = 10; /*!< \brief Maximum number of periodic boundary conditions. */
 const unsigned int MAX_STRING_SIZE = 200;    /*!< \brief Maximum number of domains. */
-const unsigned int MAX_NUMBER_FFD = 15;	     /*!< \brief Maximum number of FFDBoxes for the FFD. */
+const unsigned int MAX_NUMBER_FFD = 10;	     /*!< \brief Maximum number of FFDBoxes for the FFD. */
 const unsigned int MAX_SOLS = 7;		         /*!< \brief Maximum number of solutions at the same time (dimension of solution container array). */
 const unsigned int MAX_TERMS = 6;		         /*!< \brief Maximum number of terms in the numerical equations (dimension of solver container array). */
 const unsigned int MAX_TERMS_FEA = 10;       /*!< \brief Maximum number of terms in the numerical equations (dimension of solver container array). */
@@ -217,7 +217,6 @@ enum ENUM_SOLVER {
   DISC_ADJ_EULER = 35,
   DISC_ADJ_RANS = 36,
   DISC_ADJ_NAVIER_STOKES = 37,
-  DISC_ADJ_HEAT = 38,
   DISC_ADJ_FEM_EULER = 65,
   DISC_ADJ_FEM_RANS = 66,
   DISC_ADJ_FEM_NS = 67,
@@ -246,7 +245,6 @@ static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVE
 ("DISC_ADJ_EULER", DISC_ADJ_EULER)
 ("DISC_ADJ_RANS", DISC_ADJ_RANS)
 ("DISC_ADJ_NAVIERSTOKES", DISC_ADJ_EULER)
-("DISC_ADJ_HEAT_EQUATION_FVM", DISC_ADJ_HEAT)
 ("DISC_ADJ_FEM_EULER", DISC_ADJ_FEM_EULER)
 ("DISC_ADJ_FEM_RANS", DISC_ADJ_FEM_RANS)
 ("DISC_ADJ_FEM_NS", DISC_ADJ_FEM_NS)
@@ -457,7 +455,6 @@ enum RUNTIME_TYPE {
   RUNTIME_FEA_SYS = 20,		/*!< \brief One-physics case, the code is solving the FEA equation. */
   RUNTIME_ADJFEA_SYS = 30,		/*!< \brief One-physics case, the code is solving the adjoint FEA equation. */
   RUNTIME_HEAT_SYS = 21,		/*!< \brief One-physics case, the code is solving the heat equation. */
-  RUNTIME_ADJHEAT_SYS = 31, /*!< \brief One-physics case, the code is solving the adjoint heat equation. */
   RUNTIME_TRANS_SYS = 22,			/*!< \brief One-physics case, the code is solving the turbulence model. */
 };
 
@@ -469,7 +466,6 @@ const int ADJTURB_SOL = 3;	/*!< \brief Position of the continuous adjoint turbul
 
 const int TRANS_SOL = 4;	/*!< \brief Position of the transition model solution in the solver container array. */
 const int HEAT_SOL = 5;		/*!< \brief Position of the heat equation in the solution solver array. */
-const int ADJHEAT_SOL = 6;  /*!< \brief Position of the adjoint heat equation in the solution solver array. */
 
 const int FEA_SOL = 0;			/*!< \brief Position of the FEA equation in the solution solver array. */
 const int ADJFEA_SOL = 1;		/*!< \brief Position of the FEA adjoint equation in the solution solver array. */
@@ -548,8 +544,8 @@ enum ENUM_FLUIDMODEL {
 	VW_GAS = 2,
 	PR_GAS = 3,
   CONSTANT_DENSITY = 4,
-  INC_IDEAL_GAS = 5,
-  INC_IDEAL_GAS_POLY = 6
+  INC_IDEAL_GAS = 6
+
 };
 
 static const map<string, ENUM_FLUIDMODEL> FluidModel_Map = CCreateMap<string, ENUM_FLUIDMODEL>
@@ -558,8 +554,7 @@ static const map<string, ENUM_FLUIDMODEL> FluidModel_Map = CCreateMap<string, EN
 ("VW_GAS", VW_GAS)
 ("PR_GAS", PR_GAS)
 ("CONSTANT_DENSITY", CONSTANT_DENSITY)
-("INC_IDEAL_GAS", INC_IDEAL_GAS)
-("INC_IDEAL_GAS_POLY", INC_IDEAL_GAS_POLY);
+("INC_IDEAL_GAS", INC_IDEAL_GAS);
 
 /*!
  * \brief types of density models
@@ -608,40 +603,24 @@ static const map<string, ENUM_FREESTREAM_OPTION> FreeStreamOption_Map = CCreateM
  */
 enum ENUM_VISCOSITYMODEL {
 	CONSTANT_VISCOSITY = 0, /*!< \brief _____. */
-	SUTHERLAND = 1,
-  POLYNOMIAL_VISCOSITY = 2
+	SUTHERLAND = 1
 };
 
 static const map<string, ENUM_VISCOSITYMODEL> ViscosityModel_Map = CCreateMap<string, ENUM_VISCOSITYMODEL>
 ("CONSTANT_VISCOSITY", CONSTANT_VISCOSITY)
-("SUTHERLAND", SUTHERLAND)
-("POLYNOMIAL_VISCOSITY", POLYNOMIAL_VISCOSITY);
+("SUTHERLAND", SUTHERLAND);
 
 /*!
  * \brief types of thermal conductivity model
  */
 enum ENUM_CONDUCTIVITYMODEL {
 	CONSTANT_CONDUCTIVITY = 0, /*!< \brief _____. */
-	CONSTANT_PRANDTL = 1,
-  POLYNOMIAL_CONDUCTIVITY = 2
+	CONSTANT_PRANDTL = 1
 };
 
 static const map<string, ENUM_CONDUCTIVITYMODEL> ConductivityModel_Map = CCreateMap<string, ENUM_CONDUCTIVITYMODEL>
 ("CONSTANT_CONDUCTIVITY", CONSTANT_CONDUCTIVITY)
-("CONSTANT_PRANDTL", CONSTANT_PRANDTL)
-("POLYNOMIAL_CONDUCTIVITY", POLYNOMIAL_CONDUCTIVITY);
-
-/*!
- * \brief types of turbulent thermal conductivity model
- */
-enum ENUM_CONDUCTIVITYMODEL_TURB {
-  NO_CONDUCTIVITY_TURB  = 0,  /*!< \brief No turbulent contribution to the effective thermal conductivity for RANS. */
-  CONSTANT_PRANDTL_TURB = 1   /*!< \brief Include contribution to effective conductivity using constant turbulent Prandtl number for RANS. */
-};
-
-static const map<string, ENUM_CONDUCTIVITYMODEL_TURB> TurbConductivityModel_Map = CCreateMap<string, ENUM_CONDUCTIVITYMODEL_TURB>
-("NONE", NO_CONDUCTIVITY_TURB)
-("CONSTANT_PRANDTL_TURB", CONSTANT_PRANDTL_TURB);
+("CONSTANT_PRANDTL", CONSTANT_PRANDTL);
 
 /*!
  * \brief types of unsteady mesh motion
@@ -748,17 +727,13 @@ enum ENUM_UPWIND {
   LMROE = 12,                 /*!< \brief Rieper's Low Mach ROE numerical method . */
   SLAU2 = 13,                 /*!< \brief Simple Low-Dissipation AUSM 2 numerical method. */
   FDS = 14,                   /*!< \brief Flux difference splitting upwind method (incompressible flows). */
-  LAX_FRIEDRICH = 15,         /*!< \brief Lax-Friedrich numerical method. */
-  AUSMPLUSUP = 16,            /*!< \brief AUSM+ -up numerical method (All Speed) */
-  AUSMPLUSUP2 = 17            /*!< \brief AUSM+ -up2 numerical method (All Speed) */
+  LAX_FRIEDRICH = 15          /*!< \brief Lax-Friedrich numerical method. */
 };
 static const map<string, ENUM_UPWIND> Upwind_Map = CCreateMap<string, ENUM_UPWIND>
 ("NONE", NO_UPWIND)
 ("ROE", ROE)
 ("TURKEL_PREC", TURKEL)
 ("AUSM", AUSM)
-("AUSMPLUSUP", AUSMPLUSUP)
-("AUSMPLUSUP2", AUSMPLUSUP2)
 ("SLAU", SLAU)
 ("HLLC", HLLC)
 ("SW", SW)
@@ -998,6 +973,19 @@ enum ENUM_SPACE_ITE_FEA {
 static const map<string, ENUM_SPACE_ITE_FEA> Space_Ite_Map_FEA = CCreateMap<string, ENUM_SPACE_ITE_FEA>
 ("NEWTON_RAPHSON", NEWTON_RAPHSON)
 ("MODIFIED_NEWTON_RAPHSON", MODIFIED_NEWTON_RAPHSON);
+
+/*!
+ * \brief types of transfer methods
+ */
+enum ENUM_TRANSFER_METHOD {
+  BROADCAST_DATA = 1,	/*!< \brief Gather data on one processor and broadcast it into all of them, relating to global nodes. */
+  SCATTER_DATA = 2,   	/*!< \brief Gather data on one processor and scatter it into the one that needs it. */
+  ALLGATHER_DATA = 3,   /*!< \brief All processors gather data (this will be useful for operations over a group of data - averaging) */
+};
+static const map<string, ENUM_TRANSFER_METHOD> Transfer_Method_Map = CCreateMap<string, ENUM_TRANSFER_METHOD>
+("BROADCAST_DATA", BROADCAST_DATA)
+("SCATTER_DATA", SCATTER_DATA)
+("ALLGATHER_DATA", ALLGATHER_DATA);
 
 /*!
  * \brief types of schemes to compute the flow gradient
@@ -1290,17 +1278,6 @@ static const map<string, INLET_TYPE> Inlet_Map = CCreateMap<string, INLET_TYPE>
 ("PRESSURE_INLET", PRESSURE_INLET);
 
 /*!
- * \brief types outlet boundary treatments
- */
-enum OUTLET_TYPE {
-  PRESSURE_OUTLET = 1,    /*!< \brief Gauge pressure outlet for incompressible flow */
-  MASS_FLOW_OUTLET = 2,   /*!< \brief Mass flow outlet for incompressible flow. */
-};
-static const map<string, OUTLET_TYPE> Outlet_Map = CCreateMap<string, OUTLET_TYPE>
-("PRESSURE_OUTLET", PRESSURE_OUTLET)
-("MASS_FLOW_OUTLET", MASS_FLOW_OUTLET);
-
-/*!
  * \brief types engine inflow boundary treatments
  */
 enum ENGINE_INFLOW_TYPE {
@@ -1358,7 +1335,6 @@ enum ENUM_OBJECTIVE {
   INVERSE_DESIGN_HEATFLUX = 6,  /*!< \brief Heat flux objective function definition (inverse design). */
   TOTAL_HEATFLUX = 7,           /*!< \brief Total heat flux. */
   MAXIMUM_HEATFLUX = 8,         /*!< \brief Maximum heat flux. */
-  TOTAL_AVG_TEMPERATURE = 70,   /*!< \brief Total averaged temperature. */
   MOMENT_X_COEFFICIENT = 9,	    /*!< \brief Pitching moment objective function definition. */
   MOMENT_Y_COEFFICIENT = 10,    /*!< \brief Rolling moment objective function definition. */
   MOMENT_Z_COEFFICIENT = 11,    /*!< \brief Yawing objective function definition. */
@@ -1417,7 +1393,6 @@ static const map<string, ENUM_OBJECTIVE> Objective_Map = CCreateMap<string, ENUM
 ("TORQUE", TORQUE_COEFFICIENT)
 ("TOTAL_HEATFLUX", TOTAL_HEATFLUX)
 ("MAXIMUM_HEATFLUX", MAXIMUM_HEATFLUX)
-("TOTAL_AVG_TEMPERATURE", TOTAL_AVG_TEMPERATURE)
 ("FIGURE_OF_MERIT", FIGURE_OF_MERIT)
 ("BUFFET", BUFFET_SENSOR)
 ("SURFACE_TOTAL_PRESSURE", SURFACE_TOTAL_PRESSURE)
@@ -1555,18 +1530,6 @@ static const map<string, ENUM_OUTPUT> Output_Map = CCreateMap<string, ENUM_OUTPU
 ("CGNS", CGNS_SOL)
 ("PARAVIEW", PARAVIEW)
 ("PARAVIEW_BINARY", PARAVIEW_BINARY);
-
-/*!
- * \brief type of volume sensitivity file formats (inout to SU2_DOT)
- */
-enum ENUM_SENSITIVITY {
-  SU2_NATIVE = 1,           /*!< \brief SU2 native binary format for the volume sensitivity input. */
-  UNORDERED_ASCII = 2           /*!< \brief Unordered ASCII list (x,y,z,dJ/dx,dJ/dy/dJ/dz) format for the volume sensitivity input. */
-};
-
-static const map<string, ENUM_SENSITIVITY> Sensitivity_Map = CCreateMap<string, ENUM_SENSITIVITY>
-("SU2_NATIVE", SU2_NATIVE)
-("UNORDERED_ASCII", UNORDERED_ASCII);
 
 /*!
  * \brief type of jump definition
@@ -1950,73 +1913,6 @@ static const map<string, ENUM_INPUT_REF> Input_Ref_Map = CCreateMap<string, ENUM
 ("CUSTOM", CUSTOM_REF);
 
 /*!
- * \brief Vertex-based quantities exchanged during periodic marker communications.
- */
-enum PERIODIC_QUANTITIES {
-  PERIODIC_VOLUME     =  1,  /*!< \brief Volume communication for summing total CV (periodic only). */
-  PERIODIC_NEIGHBORS  =  2,  /*!< \brief Communication of the number of neighbors for centered schemes (periodic only). */
-  PERIODIC_RESIDUAL   =  3,  /*!< \brief Residual and Jacobian communication (periodic only). */
-  PERIODIC_LAPLACIAN  =  4,  /*!< \brief Undivided Laplacian communication for JST (periodic only). */
-  PERIODIC_MAX_EIG    =  5,  /*!< \brief Maximum eigenvalue communication (periodic only). */
-  PERIODIC_SENSOR     =  6,  /*!< \brief Dissipation sensor communication (periodic only). */
-  PERIODIC_SOL_GG     =  7,  /*!< \brief Solution gradient communication for Green-Gauss (periodic only). */
-  PERIODIC_PRIM_GG    =  8,  /*!< \brief Primitive gradient communication for Green-Gauss (periodic only). */
-  PERIODIC_SOL_LS     =  9,  /*!< \brief Solution gradient communication for Least Squares (periodic only). */
-  PERIODIC_PRIM_LS    = 10,  /*!< \brief Primitive gradient communication for Least Squares (periodic only). */
-  PERIODIC_LIM_SOL_1  = 11,  /*!< \brief Solution limiter communication phase 1 of 2 (periodic only). */
-  PERIODIC_LIM_SOL_2  = 12,  /*!< \brief Solution limiter communication phase 2 of 2 (periodic only). */
-  PERIODIC_LIM_PRIM_1 = 13,  /*!< \brief Primitive limiter communication phase 1 of 2 (periodic only). */
-  PERIODIC_LIM_PRIM_2 = 14,  /*!< \brief Primitive limiter communication phase 2 of 2 (periodic only). */
-  PERIODIC_IMPLICIT   = 15   /*!< \brief Implicit update communication to ensure consistency across periodic boundaries. */
-};
-
-/*!
- * \brief Vertex-based quantities exchanged in MPI point-to-point communications.
- */
-enum MPI_QUANTITIES {
-  SOLUTION             =  0,  /*!< \brief Conservative solution communication. */
-  SOLUTION_OLD         =  1,  /*!< \brief Conservative solution old communication. */
-  SOLUTION_GRADIENT    =  2,  /*!< \brief Conservative solution gradient communication. */
-  SOLUTION_LIMITER     =  3,  /*!< \brief Conservative solution limiter communication. */
-  SOLUTION_DISPONLY    =  4,  /*!< \brief Solution displacement only communication. */
-  SOLUTION_PRED        =  5,  /*!< \brief Solution predicted communication. */
-  SOLUTION_PRED_OLD    =  6,  /*!< \brief Solution predicted old communication. */
-  SOLUTION_GEOMETRY    =  7,  /*!< \brief Geometry solution communication. */
-  PRIMITIVE_GRADIENT   =  8,  /*!< \brief Primitive gradient communication. */
-  PRIMITIVE_LIMITER    =  9,  /*!< \brief Primitive limiter communication. */
-  UNDIVIDED_LAPLACIAN  = 10,  /*!< \brief Undivided Laplacian communication. */
-  MAX_EIGENVALUE       = 11,  /*!< \brief Maximum eigenvalue communication. */
-  SENSOR               = 12,  /*!< \brief Dissipation sensor communication. */
-  AUXVAR_GRADIENT      = 13,  /*!< \brief Auxiliary variable gradient communication. */
-  COORDINATES          = 14,  /*!< \brief Vertex coordinates communication. */
-  COORDINATES_OLD      = 15,  /*!< \brief Old vertex coordinates communication. */
-  MAX_LENGTH           = 16,  /*!< \brief Maximum length communication. */
-  GRID_VELOCITY        = 17,  /*!< \brief Grid velocity communication. */
-  CROSS_TERM           = 18,  /*!< \brief Cross term communication. */
-  CROSS_TERM_GEOMETRY  = 19,  /*!< \brief Geometric cross term communication. */
-  REF_GEOMETRY         = 20,  /*!< \brief Reference geometry communication. */
-  SOLUTION_EDDY        = 21,  /*!< \brief Turbulent solution plus eddy viscosity communication. */
-  SOLUTION_MATRIX      = 22,  /*!< \brief Matrix solution communication. */
-  SOLUTION_MATRIXTRANS = 23,  /*!< \brief Matrix transposed solution communication. */
-  NEIGHBORS            = 24,  /*!< \brief Neighbor point count communication (for JST). */
-  SOLUTION_FEA         = 25,  /*!< \brief FEA solution communication. */
-  SOLUTION_FEA_OLD     = 26   /*!< \brief FEA solution old communication. */
-};
-
-/*!
- * \brief MPI communication level
- */
-enum COMM_LEVEL {
-  COMM_NONE    = 0,   /*!< \brief Disable all MPI comms. Purely for testing, as results are incorrect. */
-  COMM_MINIMAL = 1,   /*!< \brief Perform only the minimal set of MPI communications for correctness. Disables many console and output comms. */
-  COMM_FULL    = 2    /*!< \brief Perform all MPI communications. */
-};
-static const map<string, COMM_LEVEL> Comm_Map = CCreateMap<string, COMM_LEVEL>
-("NONE",    COMM_NONE)
-("MINIMAL", COMM_MINIMAL)
-("FULL",    COMM_FULL);
-
-/*
  * \brief types of filter kernels, initially intended for structural topology optimization applications
  */
 enum ENUM_FILTER_KERNEL {

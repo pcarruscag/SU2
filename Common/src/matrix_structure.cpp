@@ -2,7 +2,7 @@
  * \file matrix_structure.cpp
  * \brief Main subroutines for doing the sparse structures
  * \author F. Palacios, A. Bueno, T. Economon
- * \version 6.2.0 "Falcon"
+ * \version 6.1.0 "Falcon"
  *
  * The current SU2 release has been coordinated by the
  * SU2 International Developers Society <www.su2devsociety.org>
@@ -18,7 +18,7 @@
  *  - Prof. Edwin van der Weide's group at the University of Twente.
  *  - Lab. of New Concepts in Aeronautics at Tech. Institute of Aeronautics.
  *
- * Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,
+ * Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,
  *                      Tim Albring, and the SU2 contributors.
  *
  * SU2 is free software; you can redistribute it and/or
@@ -37,8 +37,7 @@
 
 #include "../include/matrix_structure.hpp"
 
-template<class ScalarType>
-CSysMatrix<ScalarType>::CSysMatrix(void) {
+CSysMatrix::CSysMatrix(void) {
   
   size = SU2_MPI::GetSize();
   rank = SU2_MPI::GetRank();
@@ -86,8 +85,7 @@ CSysMatrix<ScalarType>::CSysMatrix(void) {
   
 }
 
-template<class ScalarType>
-CSysMatrix<ScalarType>::~CSysMatrix(void) {
+CSysMatrix::~CSysMatrix(void) {
   
   unsigned long iElem;
 
@@ -142,8 +140,7 @@ CSysMatrix<ScalarType>::~CSysMatrix(void) {
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::Initialize(unsigned long nPoint, unsigned long nPointDomain,
+void CSysMatrix::Initialize(unsigned long nPoint, unsigned long nPointDomain,
                             unsigned short nVar, unsigned short nEqn,
                             bool EdgeConnect, CGeometry *geometry, CConfig *config) {
 
@@ -296,7 +293,7 @@ void CSysMatrix<ScalarType>::Initialize(unsigned long nPoint, unsigned long nPoi
       
     }
     
-    ILU_matrix = new ScalarType [nnz_ilu*nVar*nEqn];
+    ILU_matrix = new su2double [nnz_ilu*nVar*nEqn];
     for (iVar = 0; iVar < nnz_ilu*nVar*nEqn; iVar++) ILU_matrix[iVar] = 0.0;
     
     delete [] nNeigh_ilu;
@@ -305,8 +302,7 @@ void CSysMatrix<ScalarType>::Initialize(unsigned long nPoint, unsigned long nPoi
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::SetNeighbours(CGeometry *geometry, unsigned long iPoint, unsigned short deep_level, unsigned short fill_level,
+void CSysMatrix::SetNeighbours(CGeometry *geometry, unsigned long iPoint, unsigned short deep_level, unsigned short fill_level,
                                bool EdgeConnect, vector<unsigned long> & vneighs) {
   unsigned long Point, iElem, Elem;
   unsigned short iNode;
@@ -333,8 +329,7 @@ void CSysMatrix<ScalarType>::SetNeighbours(CGeometry *geometry, unsigned long iP
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::SetIndexes(unsigned long val_nPoint, unsigned long val_nPointDomain, unsigned short val_nVar, unsigned short val_nEq, unsigned long* val_row_ptr, unsigned long* val_col_ind, unsigned long val_nnz, CConfig *config) {
+void CSysMatrix::SetIndexes(unsigned long val_nPoint, unsigned long val_nPointDomain, unsigned short val_nVar, unsigned short val_nEq, unsigned long* val_row_ptr, unsigned long* val_col_ind, unsigned long val_nnz, CConfig *config) {
   
   unsigned long iVar;
   
@@ -353,15 +348,15 @@ void CSysMatrix<ScalarType>::SetIndexes(unsigned long val_nPoint, unsigned long 
     nnz_ilu      = val_nnz;           // Assign number of possible non zero blocks in the spare system structure (ILU structure)
   }
   
-  matrix            = new ScalarType [nnz*nVar*nEqn];  // Reserve memory for the values of the matrix
-  block             = new ScalarType [nVar*nEqn];
-  block_weight      = new ScalarType [nVar*nEqn];
-  block_inverse     = new ScalarType [nVar*nEqn];
+  matrix            = new su2double [nnz*nVar*nEqn];  // Reserve memory for the values of the matrix
+  block             = new su2double [nVar*nEqn];
+  block_weight      = new su2double [nVar*nEqn];
+  block_inverse     = new su2double [nVar*nEqn];
 
-  prod_block_vector = new ScalarType [nEqn];
-  prod_row_vector   = new ScalarType [nVar];
-  aux_vector        = new ScalarType [nVar];
-  sum_vector        = new ScalarType [nVar];
+  prod_block_vector = new su2double [nEqn];
+  prod_row_vector   = new su2double [nVar];
+  aux_vector        = new su2double [nVar];
+  sum_vector        = new su2double [nVar];
   
   /*--- Memory initialization ---*/
   
@@ -388,7 +383,7 @@ void CSysMatrix<ScalarType>::SetIndexes(unsigned long val_nPoint, unsigned long 
       
       /*--- Reserve memory for the ILU matrix. ---*/
       
-      ILU_matrix = new ScalarType [nnz_ilu*nVar*nEqn];
+      ILU_matrix = new su2double [nnz_ilu*nVar*nEqn];
       for (iVar = 0; iVar < nnz_ilu*nVar*nEqn; iVar++) ILU_matrix[iVar] = 0.0;
       
     }
@@ -408,292 +403,14 @@ void CSysMatrix<ScalarType>::SetIndexes(unsigned long val_nPoint, unsigned long 
     
     /*--- Reserve memory for the values of the inverse of the preconditioner. ---*/
     
-    invM = new ScalarType [nPoint*nVar*nEqn];
+    invM = new su2double [nPoint*nVar*nEqn];
     for (iVar = 0; iVar < nPoint*nVar*nEqn; iVar++) invM[iVar] = 0.0;
 
   }
 
 }
 
-template<class ScalarType>
-template<class OtherType>
-void CSysMatrix<ScalarType>::InitiateComms(CSysVector<OtherType> & x,
-                                           CGeometry *geometry,
-                                           CConfig *config,
-                                           unsigned short commType) {
-  
-  /*--- Local variables ---*/
-  
-  unsigned short iVar;
-  unsigned short COUNT_PER_POINT = 0;
-  unsigned short MPI_TYPE        = 0;
-  
-  unsigned long iPoint, offset, buf_offset;
-  
-  int iMessage, iSend, nSend;
-  
-  /*--- Create a boolean for reversing the order of comms. ---*/
-  
-  bool reverse = false;
-  
-  /*--- Set the size of the data packet and type depending on quantity. ---*/
-  
-  switch (commType) {
-    case SOLUTION_MATRIX:
-      COUNT_PER_POINT  = nVar;
-      MPI_TYPE         = COMM_TYPE_DOUBLE;
-      reverse          = false;
-      break;
-    case SOLUTION_MATRIXTRANS:
-      COUNT_PER_POINT  = nVar;
-      MPI_TYPE         = COMM_TYPE_DOUBLE;
-      reverse          = true;
-      break;
-    default:
-      SU2_MPI::Error("Unrecognized quantity for point-to-point MPI comms.",
-                     CURRENT_FUNCTION);
-      break;
-  }
-  
-  /*--- Check to make sure we have created a large enough buffer
-   for these comms during preprocessing. This is only for the su2double
-   buffer. It will be reallocated whenever we find a larger count
-   per point. After the first cycle of comms, this should be inactive. ---*/
-  
-  if (COUNT_PER_POINT > geometry->countPerPoint) {
-    geometry->AllocateP2PComms(COUNT_PER_POINT);
-  }
-  
-  /*--- Set some local pointers to make access simpler. ---*/
-  
-  su2double *bufDSend = geometry->bufD_P2PSend;
-  
-  /*--- Load the specified quantity from the solver into the generic
-   communication buffer in the geometry class. ---*/
-  
-  if (geometry->nP2PSend > 0) {
-    
-    /*--- Post all non-blocking recvs first before sends. ---*/
-    
-    geometry->PostP2PRecvs(geometry, config, MPI_TYPE, reverse);
-    
-    for (iMessage = 0; iMessage < geometry->nP2PSend; iMessage++) {
-      
-      switch (commType) {
-          
-        case SOLUTION_MATRIX:
-          
-          /*--- Compute our location in the send buffer. ---*/
-          
-          offset = geometry->nPoint_P2PSend[iMessage];
-          
-          /*--- Total count can include multiple pieces of data per point. ---*/
-          
-          nSend = (geometry->nPoint_P2PSend[iMessage+1] -
-                   geometry->nPoint_P2PSend[iMessage]);
-          
-          for (iSend = 0; iSend < nSend; iSend++) {
-            
-            /*--- Get the local index for this communicated data. ---*/
-            
-            iPoint = geometry->Local_Point_P2PSend[offset + iSend];
-            
-            /*--- Compute the offset in the recv buffer for this point. ---*/
-            
-            buf_offset = (offset + iSend)*geometry->countPerPoint;
-            
-            /*--- Load the buffer with the data to be sent. ---*/
-            
-            for (iVar = 0; iVar < nVar; iVar++)
-              bufDSend[buf_offset+iVar] = x[iPoint*nVar+iVar];
-            
-          }
-          
-          break;
-          
-        case SOLUTION_MATRIXTRANS:
-          
-          /*--- We are going to communicate in reverse, so we use the
-           recv buffer for the send instead. Also, all of the offsets
-           and counts are derived from the recv data structures. ---*/
-          
-          bufDSend = geometry->bufD_P2PRecv;
-          
-          /*--- Compute our location in the send buffer. ---*/
-          
-          offset = geometry->nPoint_P2PRecv[iMessage];
-          
-          /*--- Total count can include multiple pieces of data per point. ---*/
-          
-          nSend = (geometry->nPoint_P2PRecv[iMessage+1] -
-                   geometry->nPoint_P2PRecv[iMessage]);
-          
-          for (iSend = 0; iSend < nSend; iSend++) {
-            
-            /*--- Get the local index for this communicated data. Here we
-             again use the recv structure to find the send point, since
-             the usual recv points are now the senders in reverse mode. ---*/
-            
-            iPoint = geometry->Local_Point_P2PRecv[offset + iSend];
-            
-            /*--- Compute the offset in the recv buffer for this point. ---*/
-            
-            buf_offset = (offset + iSend)*geometry->countPerPoint;
-            
-            /*--- Load the buffer with the data to be sent. ---*/
-
-            for (iVar = 0; iVar < nVar; iVar++)
-              bufDSend[buf_offset+iVar] = x[iPoint*nVar+iVar];
-            
-          }
-          
-          break;
-          
-        default:
-          SU2_MPI::Error("Unrecognized quantity for point-to-point MPI comms.",
-                         CURRENT_FUNCTION);
-          break;
-          
-      }
-      
-      /*--- Launch the point-to-point MPI send for this message. ---*/
-      
-      geometry->PostP2PSends(geometry, config, MPI_TYPE, iMessage, reverse);
-      
-    }
-  }
-  
-}
-
-template<class ScalarType>
-template<class OtherType>
-void CSysMatrix<ScalarType>::CompleteComms(CSysVector<OtherType> & x,
-                                           CGeometry *geometry,
-                                           CConfig *config,
-                                           unsigned short commType) {
-  
-  /*--- Local variables ---*/
-  
-  unsigned short iVar;
-  unsigned long iPoint, iRecv, nRecv, offset, buf_offset;
-  
-  int ind, source, iMessage, jRecv;
-  SU2_MPI::Status status;
-  
-  /*--- Set some local pointers to make access simpler. ---*/
-  
-  su2double *bufDRecv = geometry->bufD_P2PRecv;
-  
-  /*--- Store the data that was communicated into the appropriate
-   location within the local class data structures. ---*/
-  
-  if (geometry->nP2PRecv > 0) {
-    
-    for (iMessage = 0; iMessage < geometry->nP2PRecv; iMessage++) {
-      
-      /*--- For efficiency, recv the messages dynamically based on
-       the order they arrive. ---*/
-      
-      SU2_MPI::Waitany(geometry->nP2PRecv, geometry->req_P2PRecv,
-                       &ind, &status);
-      
-      /*--- Once we have recv'd a message, get the source rank. ---*/
-      
-      source = status.MPI_SOURCE;
-      
-      switch (commType) {
-        case SOLUTION_MATRIX:
-          
-          /*--- We know the offsets based on the source rank. ---*/
-          
-          jRecv = geometry->P2PRecv2Neighbor[source];
-          
-          /*--- Get the point offset for the start of this message. ---*/
-          
-          offset = geometry->nPoint_P2PRecv[jRecv];
-          
-          /*--- Get the number of packets to be received in this message. ---*/
-          
-          nRecv = (geometry->nPoint_P2PRecv[jRecv+1] -
-                   geometry->nPoint_P2PRecv[jRecv]);
-          
-          for (iRecv = 0; iRecv < nRecv; iRecv++) {
-            
-            /*--- Get the local index for this communicated data. ---*/
-            
-            iPoint = geometry->Local_Point_P2PRecv[offset + iRecv];
-            
-            /*--- Compute the offset in the recv buffer for this point. ---*/
-            
-            buf_offset = (offset + iRecv)*geometry->countPerPoint;
-            
-            /*--- Store the data correctly depending on the quantity. ---*/
-            
-            for (iVar = 0; iVar < nVar; iVar++)
-              x[iPoint*nVar+iVar] = ActiveAssign<OtherType,su2double>(bufDRecv[buf_offset+iVar]);
-            
-          }
-          break;
-          
-        case SOLUTION_MATRIXTRANS:
-          
-          /*--- We are going to communicate in reverse, so we use the
-           send buffer for the recv instead. Also, all of the offsets
-           and counts are derived from the send data structures. ---*/
-          
-          bufDRecv = geometry->bufD_P2PSend;
-          
-          /*--- We know the offsets based on the source rank. ---*/
-          
-          jRecv = geometry->P2PSend2Neighbor[source];
-          
-          /*--- Get the point offset for the start of this message. ---*/
-          
-          offset = geometry->nPoint_P2PSend[jRecv];
-          
-          /*--- Get the number of packets to be received in this message. ---*/
-          
-          nRecv = (geometry->nPoint_P2PSend[jRecv+1] -
-                   geometry->nPoint_P2PSend[jRecv]);
-          
-          for (iRecv = 0; iRecv < nRecv; iRecv++) {
-            
-            /*--- Get the local index for this communicated data. ---*/
-            
-            iPoint = geometry->Local_Point_P2PSend[offset + iRecv];
-            
-            /*--- Compute the offset in the recv buffer for this point. ---*/
-            
-            buf_offset = (offset + iRecv)*geometry->countPerPoint;
-            
-            
-            for (iVar = 0; iVar < nVar; iVar++)
-              x[iPoint*nVar+iVar] += ActiveAssign<OtherType,su2double>(bufDRecv[buf_offset+iVar]);
-            
-          }
-          
-          break;
-        default:
-          SU2_MPI::Error("Unrecognized quantity for point-to-point MPI comms.",
-                         CURRENT_FUNCTION);
-          break;
-      }
-    }
-    
-    /*--- Verify that all non-blocking point-to-point sends have finished.
-     Note that this should be satisfied, as we have received all of the
-     data in the loop above at this point. ---*/
-    
-#ifdef HAVE_MPI
-    SU2_MPI::Waitall(geometry->nP2PSend, geometry->req_P2PSend, MPI_STATUS_IGNORE);
-#endif
-    
-  }
-  
-}
-
-template<class ScalarType>
-ScalarType *CSysMatrix<ScalarType>::GetBlock(unsigned long block_i, unsigned long block_j) {
+su2double *CSysMatrix::GetBlock(unsigned long block_i, unsigned long block_j) {
   
   unsigned long step = 0, index;
   
@@ -705,8 +422,7 @@ ScalarType *CSysMatrix<ScalarType>::GetBlock(unsigned long block_i, unsigned lon
   
 }
 
-template<class ScalarType>
-ScalarType CSysMatrix<ScalarType>::GetBlock(unsigned long block_i, unsigned long block_j, unsigned short iVar, unsigned short jVar) {
+su2double CSysMatrix::GetBlock(unsigned long block_i, unsigned long block_j, unsigned short iVar, unsigned short jVar) {
   
   unsigned long step = 0, index;
   
@@ -718,8 +434,75 @@ ScalarType CSysMatrix<ScalarType>::GetBlock(unsigned long block_i, unsigned long
   
 }
 
-template<class ScalarType>
-ScalarType *CSysMatrix<ScalarType>::GetBlock_ILUMatrix(unsigned long block_i, unsigned long block_j) {
+void CSysMatrix::SetBlock(unsigned long block_i, unsigned long block_j, su2double **val_block) {
+  
+  unsigned long iVar, jVar, index, step = 0;
+  
+  for (index = row_ptr[block_i]; index < row_ptr[block_i+1]; index++) {
+    step++;
+    if (col_ind[index] == block_j) {
+      for (iVar = 0; iVar < nVar; iVar++)
+        for (jVar = 0; jVar < nEqn; jVar++)
+//          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] = val_block[iVar][jVar];  // Allow AD in Matrix Structure (disabled temporarily to avoid conflicts)
+          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] = SU2_TYPE::GetValue(val_block[iVar][jVar]);
+      break;
+    }
+  }
+  
+}
+  
+void CSysMatrix::SetBlock(unsigned long block_i, unsigned long block_j, su2double *val_block) {
+  
+  unsigned long iVar, jVar, index, step = 0;
+  
+  for (index = row_ptr[block_i]; index < row_ptr[block_i+1]; index++) {
+    step++;
+    if (col_ind[index] == block_j) {
+      for (iVar = 0; iVar < nVar; iVar++)
+        for (jVar = 0; jVar < nEqn; jVar++)
+//          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] = val_block[iVar*nVar+jVar];  // Allow AD in Matrix Structure (disabled temporarily to avoid conflicts)
+          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] = SU2_TYPE::GetValue(val_block[iVar*nVar+jVar]);
+      break;
+    }
+  }
+  
+}
+
+void CSysMatrix::AddBlock(unsigned long block_i, unsigned long block_j, su2double **val_block) {
+  
+  unsigned long iVar, jVar, index, step = 0;
+  
+  for (index = row_ptr[block_i]; index < row_ptr[block_i+1]; index++) {
+    step++;
+    if (col_ind[index] == block_j) {
+      for (iVar = 0; iVar < nVar; iVar++)
+        for (jVar = 0; jVar < nEqn; jVar++)
+//          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] += val_block[iVar][jVar];  // Allow AD in Matrix Structure (disabled temporarily to avoid conflicts)
+          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] += SU2_TYPE::GetValue(val_block[iVar][jVar]);
+      break;
+    }
+  }
+  
+}
+
+void CSysMatrix::SubtractBlock(unsigned long block_i, unsigned long block_j, su2double **val_block) {
+  
+  unsigned long iVar, jVar, index, step = 0;
+  
+  for (index = row_ptr[block_i]; index < row_ptr[block_i+1]; index++) {
+    step++;
+    if (col_ind[index] == block_j) {
+      for (iVar = 0; iVar < nVar; iVar++)
+        for (jVar = 0; jVar < nEqn; jVar++)
+//         matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] -= val_block[iVar][jVar];  // Allow AD in Matrix Structure (disabled temporarily to avoid conflicts)
+          matrix[(row_ptr[block_i]+step-1)*nVar*nEqn+iVar*nEqn+jVar] -= SU2_TYPE::GetValue(val_block[iVar][jVar]);
+      break;
+    }
+  }
+  
+}
+
+su2double *CSysMatrix::GetBlock_ILUMatrix(unsigned long block_i, unsigned long block_j) {
   
   unsigned long step = 0, index;
   
@@ -731,8 +514,7 @@ ScalarType *CSysMatrix<ScalarType>::GetBlock_ILUMatrix(unsigned long block_i, un
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::SetBlock_ILUMatrix(unsigned long block_i, unsigned long block_j, ScalarType *val_block) {
+void CSysMatrix::SetBlock_ILUMatrix(unsigned long block_i, unsigned long block_j, su2double *val_block) {
   
   unsigned long iVar, jVar, index, step = 0;
   
@@ -748,8 +530,7 @@ void CSysMatrix<ScalarType>::SetBlock_ILUMatrix(unsigned long block_i, unsigned 
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::SetBlockTransposed_ILUMatrix(unsigned long block_i, unsigned long block_j, ScalarType *val_block) {
+void CSysMatrix::SetBlockTransposed_ILUMatrix(unsigned long block_i, unsigned long block_j, su2double *val_block) {
 
   unsigned long iVar, jVar, index, step = 0;
 
@@ -765,8 +546,7 @@ void CSysMatrix<ScalarType>::SetBlockTransposed_ILUMatrix(unsigned long block_i,
 
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::SubtractBlock_ILUMatrix(unsigned long block_i, unsigned long block_j, ScalarType *val_block) {
+void CSysMatrix::SubtractBlock_ILUMatrix(unsigned long block_i, unsigned long block_j, su2double *val_block) {
   
   unsigned long iVar, jVar, index, step = 0;
   
@@ -782,8 +562,7 @@ void CSysMatrix<ScalarType>::SubtractBlock_ILUMatrix(unsigned long block_i, unsi
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixVectorProduct(ScalarType *matrix, ScalarType *vector, ScalarType *product) {
+void CSysMatrix::MatrixVectorProduct(su2double *matrix, su2double *vector, su2double *product) {
 
 #if defined(HAVE_MKL) && !(defined(CODI_REVERSE_TYPE) || defined(CODI_FORWARD_TYPE))
   // NOTE: matrix/vector swapped due to column major kernel -- manual "CBLAS" setup.
@@ -805,8 +584,7 @@ void CSysMatrix<ScalarType>::MatrixVectorProduct(ScalarType *matrix, ScalarType 
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixMatrixProduct(ScalarType *matrix_a, ScalarType *matrix_b, ScalarType *product) {
+void CSysMatrix::MatrixMatrixProduct(su2double *matrix_a, su2double *matrix_b, su2double *product) {
 
 #if defined(HAVE_MKL) && !(defined(CODI_REVERSE_TYPE) || defined(CODI_FORWARD_TYPE))
   if (useMKL)
@@ -829,8 +607,45 @@ void CSysMatrix<ScalarType>::MatrixMatrixProduct(ScalarType *matrix_a, ScalarTyp
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::DeleteValsRowi(unsigned long i) {
+void CSysMatrix::AddVal2Diag(unsigned long block_i, su2double val_matrix) {
+  
+  unsigned long step = 0, iVar, index;
+  
+  for (index = row_ptr[block_i]; index < row_ptr[block_i+1]; index++) {
+    step++;
+    if (col_ind[index] == block_i) {	// Only elements on the diagonal
+      for (iVar = 0; iVar < nVar; iVar++)
+//        matrix[(row_ptr[block_i]+step-1)*nVar*nVar+iVar*nVar+iVar] += val_matrix;  // Allow AD in Matrix Structure (disabled temporarily to avoid conflicts)
+        matrix[(row_ptr[block_i]+step-1)*nVar*nVar+iVar*nVar+iVar] += SU2_TYPE::GetValue(val_matrix);
+      break;
+    }
+  }
+  
+}
+
+void CSysMatrix::SetVal2Diag(unsigned long block_i, su2double val_matrix) {
+  
+  unsigned long step = 0, iVar, jVar, index;
+  
+  for (index = row_ptr[block_i]; index < row_ptr[block_i+1]; index++) {
+    step++;
+    if (col_ind[index] == block_i) {	// Only elements on the diagonal
+      
+      for (iVar = 0; iVar < nVar; iVar++)
+        for (jVar = 0; jVar < nVar; jVar++)
+          matrix[(row_ptr[block_i]+step-1)*nVar*nVar+iVar*nVar+jVar] = 0.0;
+      
+      for (iVar = 0; iVar < nVar; iVar++)
+//        matrix[(row_ptr[block_i]+step-1)*nVar*nVar+iVar*nVar+iVar] = val_matrix;  // Allow AD in Matrix Structure (disabled temporarily to avoid conflicts)
+        matrix[(row_ptr[block_i]+step-1)*nVar*nVar+iVar*nVar+iVar] = SU2_TYPE::GetValue(val_matrix);
+      
+      break;
+    }
+  }
+  
+}
+
+void CSysMatrix::DeleteValsRowi(unsigned long i) {
   
   unsigned long block_i = i/nVar;
   unsigned long row = i - block_i*nVar;
@@ -845,12 +660,12 @@ void CSysMatrix<ScalarType>::DeleteValsRowi(unsigned long i) {
   
 }
 
-template<class ScalarType>
-ScalarType CSysMatrix<ScalarType>::MatrixDeterminant(ScalarType **a, unsigned long n) {
+
+su2double CSysMatrix::MatrixDeterminant(su2double **a, unsigned long n) {
   
   unsigned long i, j, j1, j2;
-  ScalarType det = 0;
-  ScalarType **m = NULL;
+  su2double det = 0;
+  su2double **m = NULL;
   
   if (n < 1) { }
   else if (n == 1) { det = a[0][0]; }
@@ -859,9 +674,9 @@ ScalarType CSysMatrix<ScalarType>::MatrixDeterminant(ScalarType **a, unsigned lo
     det = 0.0;
 
     for (j1=0;j1<n;j1++) {
-      m = new ScalarType*[n-1];
+      m = new su2double*[n-1];
       for (i=0;i<n-1;i++)
-        m[i] = new ScalarType[n-1];
+        m[i] = new su2double[n-1];
       
       for (i=1;i<n;i++) {
         j2 = 0;
@@ -885,16 +700,15 @@ ScalarType CSysMatrix<ScalarType>::MatrixDeterminant(ScalarType **a, unsigned lo
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixCoFactor(ScalarType **a, unsigned long n, ScalarType **b) {
+void CSysMatrix::MatrixCoFactor(su2double **a, unsigned long n, su2double **b) {
   
   unsigned long i,j,ii,jj,i1,j1;
-  ScalarType det;
-  ScalarType **c;
+  su2double det;
+  su2double **c;
   
-  c = new ScalarType*[n-1];
+  c = new su2double*[n-1];
   for (i=0;i<n-1;i++)
-    c[i] = new ScalarType[n-1];
+    c[i] = new su2double[n-1];
   
   for (j=0;j<n;j++) {
     for (i=0;i<n;i++) {
@@ -927,11 +741,10 @@ void CSysMatrix<ScalarType>::MatrixCoFactor(ScalarType **a, unsigned long n, Sca
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixTranspose(ScalarType **a, unsigned long n) {
+void CSysMatrix::MatrixTranspose(su2double **a, unsigned long n) {
   
   unsigned long i, j;
-  ScalarType tmp;
+  su2double tmp;
   
   for (i=1;i<n;i++) {
     for (j=0;j<i;j++) {
@@ -943,13 +756,12 @@ void CSysMatrix<ScalarType>::MatrixTranspose(ScalarType **a, unsigned long n) {
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::Gauss_Elimination(unsigned long block_i, ScalarType* rhs, bool transposed) {
+void CSysMatrix::Gauss_Elimination(unsigned long block_i, su2double* rhs, bool transposed) {
   
   short iVar, jVar, kVar; // This is important, otherwise some compilers optimizations will fail
-  ScalarType weight, aux;
+  su2double weight, aux;
   
-  ScalarType *Block = GetBlock(block_i, block_i);
+  su2double *Block = GetBlock(block_i, block_i);
   
   /*--- Copy block matrix, note that the original matrix
    is modified by the algorithm---*/
@@ -995,20 +807,19 @@ void CSysMatrix<ScalarType>::Gauss_Elimination(unsigned long block_i, ScalarType
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::Gauss_Elimination_ILUMatrix(unsigned long block_i, ScalarType* rhs) {
+void CSysMatrix::Gauss_Elimination_ILUMatrix(unsigned long block_i, su2double* rhs) {
   
   short iVar, jVar, kVar; // This is important, otherwise some compilers optimizations will fail
-  ScalarType weight, aux;
+  su2double weight, aux;
   
-  ScalarType *Block = GetBlock_ILUMatrix(block_i, block_i);
+  su2double *Block = GetBlock_ILUMatrix(block_i, block_i);
   
   /*--- Copy block matrix, note that the original matrix
    is modified by the algorithm---*/
 
 
   // If source and dest overlap higher level problems occur, so memcpy is safe. And it is faster.
-  memcpy( block, Block, (nVar * nVar * sizeof(ScalarType)) );
+  memcpy( block, Block, (nVar * nVar * sizeof(su2double)) );
 
   //for (iVar = 0; iVar < (short)nVar; iVar++)
   //  for (jVar = 0; jVar < (short)nVar; jVar++)
@@ -1058,11 +869,10 @@ void CSysMatrix<ScalarType>::Gauss_Elimination_ILUMatrix(unsigned long block_i, 
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::Gauss_Elimination(ScalarType* Block, ScalarType* rhs) {
+void CSysMatrix::Gauss_Elimination(su2double* Block, su2double* rhs) {
   
   short iVar, jVar, kVar; // This is important, otherwise some compilers optimizations will fail
-  ScalarType weight, aux;
+  su2double weight, aux;
   
   /*--- Copy block matrix, note that the original matrix
    is modified by the algorithm---*/
@@ -1099,13 +909,12 @@ void CSysMatrix<ScalarType>::Gauss_Elimination(ScalarType* Block, ScalarType* rh
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::ProdBlockVector(unsigned long block_i, unsigned long block_j, const CSysVector<ScalarType> & vec) {
+void CSysMatrix::ProdBlockVector(unsigned long block_i, unsigned long block_j, const CSysVector & vec) {
   
   unsigned long j = block_j*nVar;
   unsigned short iVar, jVar;
   
-  ScalarType *block = GetBlock(block_i, block_j);
+  su2double *block = GetBlock(block_i, block_j);
   
   for (iVar = 0; iVar < nVar; iVar++) {
     prod_block_vector[iVar] = 0;
@@ -1115,8 +924,7 @@ void CSysMatrix<ScalarType>::ProdBlockVector(unsigned long block_i, unsigned lon
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::UpperProduct(CSysVector<ScalarType> & vec, unsigned long row_i) {
+void CSysMatrix::UpperProduct(CSysVector & vec, unsigned long row_i) {
   
   unsigned long iVar, index;
   
@@ -1133,8 +941,7 @@ void CSysMatrix<ScalarType>::UpperProduct(CSysVector<ScalarType> & vec, unsigned
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::LowerProduct(CSysVector<ScalarType> & vec, unsigned long row_i) {
+void CSysMatrix::LowerProduct(CSysVector & vec, unsigned long row_i) {
   
   unsigned long iVar, index;
   
@@ -1151,8 +958,7 @@ void CSysMatrix<ScalarType>::LowerProduct(CSysVector<ScalarType> & vec, unsigned
 
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::DiagonalProduct(CSysVector<ScalarType> & vec, unsigned long row_i) {
+void CSysMatrix::DiagonalProduct(CSysVector & vec, unsigned long row_i) {
   
   unsigned long iVar, index;
   
@@ -1169,13 +975,11 @@ void CSysMatrix<ScalarType>::DiagonalProduct(CSysVector<ScalarType> & vec, unsig
   
 }
 
-template<class ScalarType>
-template<class OtherType>
-void CSysMatrix<ScalarType>::SendReceive_Solution(CSysVector<OtherType> & x, CGeometry *geometry, CConfig *config) {
+void CSysMatrix::SendReceive_Solution(CSysVector & x, CGeometry *geometry, CConfig *config) {
   
   unsigned short iVar, iMarker, MarkerS, MarkerR;
   unsigned long iVertex, iPoint, nVertexS, nVertexR, nBufferS_Vector, nBufferR_Vector;
-  OtherType *Buffer_Receive = NULL, *Buffer_Send = NULL;
+  su2double *Buffer_Receive = NULL, *Buffer_Send = NULL;
   
 #ifdef HAVE_MPI
   int send_to, receive_from;
@@ -1201,8 +1005,8 @@ void CSysMatrix<ScalarType>::SendReceive_Solution(CSysVector<OtherType> & x, CGe
       
       /*--- Allocate Receive and send buffers  ---*/
       
-      Buffer_Receive = new OtherType [nBufferR_Vector];
-      Buffer_Send = new OtherType[nBufferS_Vector];
+      Buffer_Receive = new su2double [nBufferR_Vector];
+      Buffer_Send = new su2double[nBufferS_Vector];
       
       /*--- Copy the solution that should be sended ---*/
       
@@ -1216,7 +1020,7 @@ void CSysMatrix<ScalarType>::SendReceive_Solution(CSysVector<OtherType> & x, CGe
       
       /*--- Send/Receive information using Sendrecv ---*/
       
-      SelectMPIWrapper<OtherType>::W::Sendrecv(Buffer_Send, nBufferS_Vector, MPI_DOUBLE, send_to, 0,
+      SU2_MPI::Sendrecv(Buffer_Send, nBufferS_Vector, MPI_DOUBLE, send_to, 0,
                    Buffer_Receive, nBufferR_Vector, MPI_DOUBLE, receive_from, 0, MPI_COMM_WORLD, &status);
       
 #else
@@ -1259,12 +1063,11 @@ void CSysMatrix<ScalarType>::SendReceive_Solution(CSysVector<OtherType> & x, CGe
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::SendReceive_SolutionTransposed(CSysVector<ScalarType> & x, CGeometry *geometry, CConfig *config) {
+void CSysMatrix::SendReceive_SolutionTransposed(CSysVector & x, CGeometry *geometry, CConfig *config) {
 
   unsigned short iVar, iMarker, MarkerS, MarkerR;
   unsigned long iVertex, iPoint, nVertexS, nVertexR, nBufferS_Vector, nBufferR_Vector;
-  ScalarType *Buffer_Receive = NULL, *Buffer_Send = NULL;
+  su2double *Buffer_Receive = NULL, *Buffer_Send = NULL;
 
 #ifdef HAVE_MPI
   int send_to, receive_from;
@@ -1290,8 +1093,8 @@ void CSysMatrix<ScalarType>::SendReceive_SolutionTransposed(CSysVector<ScalarTyp
 
       /*--- Allocate Receive and send buffers  ---*/
 
-      Buffer_Receive = new ScalarType [nBufferR_Vector];
-      Buffer_Send = new ScalarType[nBufferS_Vector];
+      Buffer_Receive = new su2double [nBufferR_Vector];
+      Buffer_Send = new su2double[nBufferS_Vector];
 
       /*--- Copy the solution that should be sended ---*/
 
@@ -1305,7 +1108,7 @@ void CSysMatrix<ScalarType>::SendReceive_SolutionTransposed(CSysVector<ScalarTyp
 
       /*--- Send/Receive information using Sendrecv ---*/
 
-      SelectMPIWrapper<ScalarType>::W::Sendrecv(Buffer_Send, nBufferS_Vector, MPI_DOUBLE, send_to, 0,
+      SU2_MPI::Sendrecv(Buffer_Send, nBufferS_Vector, MPI_DOUBLE, send_to, 0,
                    Buffer_Receive, nBufferR_Vector, MPI_DOUBLE, receive_from, 0, MPI_COMM_WORLD, &status);
 
 #else
@@ -1348,8 +1151,7 @@ void CSysMatrix<ScalarType>::SendReceive_SolutionTransposed(CSysVector<ScalarTyp
 
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::RowProduct(const CSysVector<ScalarType> & vec, unsigned long row_i) {
+void CSysMatrix::RowProduct(const CSysVector & vec, unsigned long row_i) {
   
   unsigned long iVar, index;
   
@@ -1364,8 +1166,7 @@ void CSysMatrix<ScalarType>::RowProduct(const CSysVector<ScalarType> & vec, unsi
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixVectorProduct(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod) {
+void CSysMatrix::MatrixVectorProduct(const CSysVector & vec, CSysVector & prod) {
   
   unsigned long iPoint, iVar;
   
@@ -1377,24 +1178,23 @@ void CSysMatrix<ScalarType>::MatrixVectorProduct(const CSysVector<ScalarType> & 
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixVectorProduct(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod, CGeometry *geometry, CConfig *config) {
+void CSysMatrix::MatrixVectorProduct(const CSysVector & vec, CSysVector & prod, CGeometry *geometry, CConfig *config) {
   
   unsigned long prod_begin, vec_begin, mat_begin, index, iVar, jVar, row_i;
   
-  /*--- Some checks for consistency between CSysMatrix and the CSysVector<ScalarType>s ---*/
+  /*--- Some checks for consistency between CSysMatrix and the CSysVectors ---*/
   if ( (nVar != vec.GetNVar()) || (nVar != prod.GetNVar()) ) {
-    cerr << "CSysMatrix<ScalarType>::MatrixVectorProduct(const CSysVector<ScalarType>&, CSysVector<ScalarType>): "
+    cerr << "CSysMatrix::MatrixVectorProduct(const CSysVector&, CSysVector): "
     << "nVar values incompatible." << endl;
     throw(-1);
   }
   if ( (nPoint != vec.GetNBlk()) || (nPoint != prod.GetNBlk()) ) {
-    cerr << "CSysMatrix<ScalarType>::MatrixVectorProduct(const CSysVector<ScalarType>&, CSysVector<ScalarType>): "
+    cerr << "CSysMatrix::MatrixVectorProduct(const CSysVector&, CSysVector): "
     << "nPoint and nBlk values incompatible." << endl;
     throw(-1);
   }
   
-  prod = ScalarType(0.0); // set all entries of prod to zero
+  prod = su2double(0.0); // set all entries of prod to zero
   for (row_i = 0; row_i < nPointDomain; row_i++) {
     prod_begin = row_i*nVar; // offset to beginning of block row_i
     for (index = row_ptr[row_i]; index < row_ptr[row_i+1]; index++) {
@@ -1416,18 +1216,15 @@ void CSysMatrix<ScalarType>::MatrixVectorProduct(const CSysVector<ScalarType> & 
   }
   
   /*--- MPI Parallelization ---*/
-  
-  InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-  CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+  SendReceive_Solution(prod, geometry, config);
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::MatrixVectorProductTransposed(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod, CGeometry *geometry, CConfig *config) {
+void CSysMatrix::MatrixVectorProductTransposed(const CSysVector & vec, CSysVector & prod, CGeometry *geometry, CConfig *config) {
 
   unsigned long prod_begin, vec_begin, mat_begin, index, iVar, jVar , row_i;
 
-  /*--- Some checks for consistency between CSysMatrix and the CSysVector<ScalarType>s ---*/
+  /*--- Some checks for consistency between CSysMatrix and the CSysVectors ---*/
   if ( (nVar != vec.GetNVar()) || (nVar != prod.GetNVar()) ) {
     SU2_MPI::Error("nVar values incompatible.", CURRENT_FUNCTION);
   }
@@ -1435,7 +1232,7 @@ void CSysMatrix<ScalarType>::MatrixVectorProductTransposed(const CSysVector<Scal
     SU2_MPI::Error("nPoint and nBlk values incompatible.", CURRENT_FUNCTION);
   }
 
-  prod = ScalarType(0.0); // set all entries of prod to zero
+  prod = su2double(0.0); // set all entries of prod to zero
   for (row_i = 0; row_i < nPointDomain; row_i++) {
     vec_begin = row_i*nVar; // offset to beginning of block col_ind[index]
     for (index = row_ptr[row_i]; index < row_ptr[row_i+1]; index++) {
@@ -1450,14 +1247,11 @@ void CSysMatrix<ScalarType>::MatrixVectorProductTransposed(const CSysVector<Scal
   }
 
   /*--- MPI Parallelization ---*/
+  SendReceive_SolutionTransposed(prod, geometry, config);
 
-  InitiateComms(prod, geometry, config, SOLUTION_MATRIXTRANS);
-  CompleteComms(prod, geometry, config, SOLUTION_MATRIXTRANS);
-  
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::GetMultBlockBlock(ScalarType *c, ScalarType *a, ScalarType *b) {
+void CSysMatrix::GetMultBlockBlock(su2double *c, su2double *a, su2double *b) {
   
   unsigned long iVar, jVar, kVar;
   
@@ -1470,8 +1264,7 @@ void CSysMatrix<ScalarType>::GetMultBlockBlock(ScalarType *c, ScalarType *a, Sca
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::GetMultBlockVector(ScalarType *c, ScalarType *a, ScalarType *b) {
+void CSysMatrix::GetMultBlockVector(su2double *c, su2double *a, su2double *b) {
   
   unsigned long iVar, jVar;
   
@@ -1483,8 +1276,7 @@ void CSysMatrix<ScalarType>::GetMultBlockVector(ScalarType *c, ScalarType *a, Sc
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::GetSubsBlock(ScalarType *c, ScalarType *a, ScalarType *b) {
+void CSysMatrix::GetSubsBlock(su2double *c, su2double *a, su2double *b) {
   
   unsigned long iVar, jVar;
   
@@ -1494,8 +1286,7 @@ void CSysMatrix<ScalarType>::GetSubsBlock(ScalarType *c, ScalarType *a, ScalarTy
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::GetSubsVector(ScalarType *c, ScalarType *a, ScalarType *b) {
+void CSysMatrix::GetSubsVector(su2double *c, su2double *a, su2double *b) {
   
   unsigned long iVar;
   
@@ -1504,8 +1295,7 @@ void CSysMatrix<ScalarType>::GetSubsVector(ScalarType *c, ScalarType *a, ScalarT
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::InverseBlock(ScalarType *Block, ScalarType *invBlock) {
+void CSysMatrix::InverseBlock(su2double *Block, su2double *invBlock) {
   
   unsigned long iVar, jVar;
   
@@ -1523,8 +1313,7 @@ void CSysMatrix<ScalarType>::InverseBlock(ScalarType *Block, ScalarType *invBloc
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::InverseDiagonalBlock(unsigned long block_i, ScalarType *invBlock, bool transpose) {
+void CSysMatrix::InverseDiagonalBlock(unsigned long block_i, su2double *invBlock, bool transpose) {
   
   unsigned long iVar, jVar;
   
@@ -1540,14 +1329,14 @@ void CSysMatrix<ScalarType>::InverseDiagonalBlock(unsigned long block_i, ScalarT
       invBlock[jVar*nVar+iVar] = aux_vector[jVar];
   }
   
-  //  ScalarType Det, **Matrix, **CoFactor;
-  //  ScalarType *Block = GetBlock(block_i, block_i);
+  //  su2double Det, **Matrix, **CoFactor;
+  //  su2double *Block = GetBlock(block_i, block_i);
   //
-  //  Matrix = new ScalarType*[nVar];
-  //  CoFactor = new ScalarType*[nVar];
+  //  Matrix = new su2double*[nVar];
+  //  CoFactor = new su2double*[nVar];
   //  for (iVar=0;iVar<nVar;iVar++) {
-  //    Matrix[iVar] = new ScalarType[nVar];
-  //    CoFactor[iVar] = new ScalarType[nVar];
+  //    Matrix[iVar] = new su2double[nVar];
+  //    CoFactor[iVar] = new su2double[nVar];
   //  }
   //
   //  for (iVar = 0; iVar < nVar; iVar++) {
@@ -1574,8 +1363,8 @@ void CSysMatrix<ScalarType>::InverseDiagonalBlock(unsigned long block_i, ScalarT
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::InverseDiagonalBlock_ILUMatrix(unsigned long block_i, ScalarType *invBlock) {
+
+void CSysMatrix::InverseDiagonalBlock_ILUMatrix(unsigned long block_i, su2double *invBlock) {
   
   unsigned long iVar, jVar;
 
@@ -1591,14 +1380,14 @@ void CSysMatrix<ScalarType>::InverseDiagonalBlock_ILUMatrix(unsigned long block_
       invBlock[jVar*nVar+iVar] = aux_vector[jVar];
   }
   
-  //  ScalarType Det, **Matrix, **CoFactor;
-  //  ScalarType *Block = GetBlock_ILUMatrix(block_i, block_i);
+  //  su2double Det, **Matrix, **CoFactor;
+  //  su2double *Block = GetBlock_ILUMatrix(block_i, block_i);
   //
-  //  Matrix = new ScalarType*[nVar];
-  //  CoFactor = new ScalarType*[nVar];
+  //  Matrix = new su2double*[nVar];
+  //  CoFactor = new su2double*[nVar];
   //  for (iVar=0;iVar<nVar;iVar++) {
-  //    Matrix[iVar] = new ScalarType[nVar];
-  //    CoFactor[iVar] = new ScalarType[nVar];
+  //    Matrix[iVar] = new su2double[nVar];
+  //    CoFactor[iVar] = new su2double[nVar];
   //  }
   //
   //  for (iVar = 0; iVar < nVar; iVar++) {
@@ -1625,8 +1414,7 @@ void CSysMatrix<ScalarType>::InverseDiagonalBlock_ILUMatrix(unsigned long block_
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::BuildJacobiPreconditioner(bool transpose) {
+void CSysMatrix::BuildJacobiPreconditioner(bool transpose) {
 
   unsigned long iPoint, iVar, jVar;
 
@@ -1644,8 +1432,8 @@ void CSysMatrix<ScalarType>::BuildJacobiPreconditioner(bool transpose) {
 
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::ComputeJacobiPreconditioner(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod, CGeometry *geometry, CConfig *config) {
+
+void CSysMatrix::ComputeJacobiPreconditioner(const CSysVector & vec, CSysVector & prod, CGeometry *geometry, CConfig *config) {
   
   unsigned long iPoint, iVar, jVar;
   
@@ -1660,17 +1448,13 @@ void CSysMatrix<ScalarType>::ComputeJacobiPreconditioner(const CSysVector<Scalar
   
   /*--- MPI Parallelization ---*/
   
-  InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-  CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+  SendReceive_Solution(prod, geometry, config);
   
 }
 
-template<class ScalarType>
-unsigned long CSysMatrix<ScalarType>::Jacobi_Smoother(const CSysVector<ScalarType> & b, CSysVector<ScalarType> & x, CMatrixVectorProduct<ScalarType> & mat_vec, ScalarType tol, unsigned long m, ScalarType *residual, bool monitoring, CGeometry *geometry, CConfig *config) {
+unsigned long CSysMatrix::Jacobi_Smoother(const CSysVector & b, CSysVector & x, CMatrixVectorProduct & mat_vec, su2double tol, unsigned long m, su2double *residual, bool monitoring, CGeometry *geometry, CConfig *config) {
   
   unsigned long iPoint, iVar, jVar;
-  ScalarType norm_r = 0.0, norm0 = 0.0;
-  int i = 0;
   
   /*---  Check the number of iterations requested ---*/
   
@@ -1684,39 +1468,33 @@ unsigned long CSysMatrix<ScalarType>::Jacobi_Smoother(const CSysVector<ScalarTyp
    of the Jacobian matrix with the current solution (x^k). These must be
    stored in order to perform multiple iterations of the smoother. ---*/
   
-  CSysVector<ScalarType> r(b);
-  CSysVector<ScalarType> A_x(b);
+  CSysVector r(b);
+  CSysVector A_x(b);
   
   /*--- Calculate the initial residual, compute norm, and check
    if system is already solved. Recall, r holds b initially. ---*/
   
   mat_vec(x, A_x);
   r -= A_x;
+  su2double norm_r = r.norm();
+  su2double norm0  = b.norm();
+  if ( (norm_r < tol*norm0) || (norm_r < eps) ) {
+    if (rank == MASTER_NODE) cout << "CSysMatrix::Jacobi_Smoother(): system solved by initial guess." << endl;
+    return 0;
+  }
   
-  /*--- Only compute the residuals in full communication mode. ---*/
+  /*--- Set the norm to the initial initial residual value ---*/
   
-  if (config->GetComm_Level() == COMM_FULL) {
-    
-    norm_r = r.norm();
-    norm0  = b.norm();
-    if ( (norm_r < tol*norm0) || (norm_r < eps) ) {
-      if (rank == MASTER_NODE) cout << "CSysMatrix::Jacobi_Smoother(): system solved by initial guess." << endl;
-      return 0;
-    }
-    
-    /*--- Set the norm to the initial residual value ---*/
-    
-    norm0 = norm_r;
-    
-    /*--- Output header information including initial residual ---*/
-    
-    if ((monitoring) && (rank == MASTER_NODE)) {
-      cout << "\n# " << "Jacobi Smoother" << " residual history" << endl;
-      cout << "# Residual tolerance target = " << tol << endl;
-      cout << "# Initial residual norm     = " << norm_r << endl;
-      cout << "     " << i << "     " << norm_r/norm0 << endl;
-    }
-    
+  norm0 = norm_r;
+  
+  /*--- Output header information including initial residual ---*/
+  
+  int i = 0;
+  if ((monitoring) && (rank == MASTER_NODE)) {
+    cout << "\n# " << "Jacobi Smoother" << " residual history" << endl;
+    cout << "# Residual tolerance target = " << tol << endl;
+    cout << "# Initial residual norm     = " << norm_r << endl;
+    cout << "     " << i << "     " << norm_r/norm0 << endl;
   }
   
   /*---  Loop over all smoothing iterations ---*/
@@ -1737,8 +1515,7 @@ unsigned long CSysMatrix<ScalarType>::Jacobi_Smoother(const CSysVector<ScalarTyp
     
     /*--- MPI Parallelization ---*/
     
-    InitiateComms(x, geometry, config, SOLUTION_MATRIX);
-    CompleteComms(x, geometry, config, SOLUTION_MATRIX);
+    SendReceive_Solution(x, geometry, config);
     
     /*--- Update the residual (r^k+1 = b - A*x^k+1) with the new solution ---*/
     
@@ -1746,23 +1523,17 @@ unsigned long CSysMatrix<ScalarType>::Jacobi_Smoother(const CSysVector<ScalarTyp
     mat_vec(x, A_x);
     r -= A_x;
     
-    /*--- Only compute the residuals in full communication mode. ---*/
+    /*--- Check if solution has converged, else output the relative
+     residual if necessary. ---*/
     
-    if (config->GetComm_Level() == COMM_FULL) {
-      
-      /*--- Check if solution has converged, else output the relative
-       residual if necessary. ---*/
-      
-      norm_r = r.norm();
-      if (norm_r < tol*norm0) break;
-      if (((monitoring) && (rank == MASTER_NODE)) && ((i+1) % 5 == 0))
-        cout << "     " << i << "     " << norm_r/norm0 << endl;
-      
-    }
+    norm_r = r.norm();
+    if (norm_r < tol*norm0) break;
+    if (((monitoring) && (rank == MASTER_NODE)) && ((i+1) % 5 == 0))
+      cout << "     " << i << "     " << norm_r/norm0 << endl;
     
   }
   
-  if ((monitoring) && (rank == MASTER_NODE) && (config->GetComm_Level() == COMM_FULL)) {
+  if ((monitoring) && (rank == MASTER_NODE)) {
     cout << "# Jacobi smoother final (true) residual:" << endl;
     cout << "# Iteration = " << i << ": |res|/|res0| = "  << norm_r/norm0 << ".\n" << endl;
   }
@@ -1771,11 +1542,10 @@ unsigned long CSysMatrix<ScalarType>::Jacobi_Smoother(const CSysVector<ScalarTyp
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::BuildILUPreconditioner(bool transposed) {
+void CSysMatrix::BuildILUPreconditioner(bool transposed) {
   
   unsigned long index, index_, iVar;
-  ScalarType *Block_ij, *Block_jk;
+  su2double *Block_ij, *Block_jk;
   long iPoint, jPoint, kPoint;
   
 
@@ -1855,11 +1625,10 @@ void CSysMatrix<ScalarType>::BuildILUPreconditioner(bool transposed) {
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::ComputeILUPreconditioner(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod, CGeometry *geometry, CConfig *config) {
+void CSysMatrix::ComputeILUPreconditioner(const CSysVector & vec, CSysVector & prod, CGeometry *geometry, CConfig *config) {
   
   unsigned long index;
-  ScalarType *Block_ij;
+  su2double *Block_ij;
   long iPoint, jPoint;
   unsigned short iVar;
   
@@ -1916,20 +1685,16 @@ void CSysMatrix<ScalarType>::ComputeILUPreconditioner(const CSysVector<ScalarTyp
   
   /*--- MPI Parallelization ---*/
   
-  InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-  CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+  SendReceive_Solution(prod, geometry, config);
   
 }
 
-template<class ScalarType>
-unsigned long CSysMatrix<ScalarType>::ILU_Smoother(const CSysVector<ScalarType> & b, CSysVector<ScalarType> & x, CMatrixVectorProduct<ScalarType> & mat_vec, ScalarType tol, unsigned long m, ScalarType *residual, bool monitoring, CGeometry *geometry, CConfig *config) {
+unsigned long CSysMatrix::ILU_Smoother(const CSysVector & b, CSysVector & x, CMatrixVectorProduct & mat_vec, su2double tol, unsigned long m, su2double *residual, bool monitoring, CGeometry *geometry, CConfig *config) {
   
   unsigned long index;
-  ScalarType *Block_ij, omega = 1.0;
+  su2double *Block_ij, omega = 1.0;
   long iPoint, jPoint;
   unsigned short iVar;
-  ScalarType norm_r = 0.0, norm0 = 0.0;
-  int i = 0;
   
   /*---  Check the number of iterations requested ---*/
   
@@ -1943,39 +1708,33 @@ unsigned long CSysMatrix<ScalarType>::ILU_Smoother(const CSysVector<ScalarType> 
    of the Jacobian matrix with the current solution (x^k). These must be
    stored in order to perform multiple iterations of the smoother. ---*/
   
-  CSysVector<ScalarType> r(b);
-  CSysVector<ScalarType> A_x(b);
+  CSysVector r(b);
+  CSysVector A_x(b);
   
   /*--- Calculate the initial residual, compute norm, and check
    if system is already solved. Recall, r holds b initially. ---*/
   
   mat_vec(x, A_x);
   r -= A_x;
+  su2double norm_r = r.norm();
+  su2double norm0  = b.norm();
+  if ( (norm_r < tol*norm0) || (norm_r < eps) ) {
+    if (rank == MASTER_NODE) cout << "CSysMatrix::ILU_Smoother(): system solved by initial guess." << endl;
+    return 0;
+  }
   
-  /*--- Only compute the residuals in full communication mode. ---*/
+  /*--- Set the norm to the initial initial residual value ---*/
   
-  if (config->GetComm_Level() == COMM_FULL) {
-    
-    norm_r = r.norm();
-    norm0  = b.norm();
-    if ( (norm_r < tol*norm0) || (norm_r < eps) ) {
-      if (rank == MASTER_NODE) cout << "CSysMatrix::ILU_Smoother(): system solved by initial guess." << endl;
-      return 0;
-    }
-    
-    /*--- Set the norm to the initial residual value ---*/
-    
-    norm0 = norm_r;
-    
-    /*--- Output header information including initial residual ---*/
-    
-    if ((monitoring) && (rank == MASTER_NODE)) {
-      cout << "\n# " << "ILU Smoother" << " residual history" << endl;
-      cout << "# Residual tolerance target = " << tol << endl;
-      cout << "# Initial residual norm     = " << norm_r << endl;
-      cout << "     " << i << "     " << norm_r/norm0 << endl;
-    }
-    
+  norm0 = norm_r;
+  
+  /*--- Output header information including initial residual ---*/
+  
+  int i = 0;
+  if ((monitoring) && (rank == MASTER_NODE)) {
+    cout << "\n# " << "ILU Smoother" << " residual history" << endl;
+    cout << "# Residual tolerance target = " << tol << endl;
+    cout << "# Initial residual norm     = " << norm_r << endl;
+    cout << "     " << i << "     " << norm_r/norm0 << endl;
   }
   
   /*---  Loop over all smoothing iterations ---*/
@@ -2047,8 +1806,7 @@ unsigned long CSysMatrix<ScalarType>::ILU_Smoother(const CSysVector<ScalarType> 
     
     /*--- MPI Parallelization ---*/
     
-    InitiateComms(x, geometry, config, SOLUTION_MATRIX);
-    CompleteComms(x, geometry, config, SOLUTION_MATRIX);
+    SendReceive_Solution(x, geometry, config);
     
     /*--- Update the residual (r^k+1 = b - A*x^k+1) with the new solution ---*/
     
@@ -2056,23 +1814,17 @@ unsigned long CSysMatrix<ScalarType>::ILU_Smoother(const CSysVector<ScalarType> 
     mat_vec(x, A_x);
     r -= A_x;
     
-    /*--- Only compute the residuals in full communication mode. ---*/
+    /*--- Check if solution has converged, else output the relative 
+     residual if necessary. ---*/
     
-    if (config->GetComm_Level() == COMM_FULL) {
-      
-      /*--- Check if solution has converged, else output the relative
-       residual if necessary. ---*/
-      
-      norm_r = r.norm();
-      if (norm_r < tol*norm0) break;
-      if (((monitoring) && (rank == MASTER_NODE)) && ((i+1) % 5 == 0))
-        cout << "     " << i << "     " << norm_r/norm0 << endl;
-      
-    }
+    norm_r = r.norm();
+    if (norm_r < tol*norm0) break;
+    if (((monitoring) && (rank == MASTER_NODE)) && ((i+1) % 5 == 0))
+      cout << "     " << i << "     " << norm_r/norm0 << endl;
     
   }
   
-  if ((monitoring) && (rank == MASTER_NODE) && (config->GetComm_Level() == COMM_FULL)) {
+  if ((monitoring) && (rank == MASTER_NODE)) {
     cout << "# ILU smoother final (true) residual:" << endl;
     cout << "# Iteration = " << i << ": |res|/|res0| = "  << norm_r/norm0 << ".\n" << endl;
   }
@@ -2081,8 +1833,7 @@ unsigned long CSysMatrix<ScalarType>::ILU_Smoother(const CSysVector<ScalarType> 
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::ComputeLU_SGSPreconditioner(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod, CGeometry *geometry, CConfig *config) {
+void CSysMatrix::ComputeLU_SGSPreconditioner(const CSysVector & vec, CSysVector & prod, CGeometry *geometry, CConfig *config) {
   unsigned long iPoint, iVar;
   
   /*--- First part of the symmetric iteration: (D+L).x* = b ---*/
@@ -2098,8 +1849,7 @@ void CSysMatrix<ScalarType>::ComputeLU_SGSPreconditioner(const CSysVector<Scalar
   
   /*--- MPI Parallelization ---*/
   
-  InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-  CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+  SendReceive_Solution(prod, geometry, config);
   
   /*--- Second part of the symmetric iteration: (D+U).x_(1) = D.x* ---*/
   
@@ -2117,18 +1867,14 @@ void CSysMatrix<ScalarType>::ComputeLU_SGSPreconditioner(const CSysVector<Scalar
   
   /*--- MPI Parallelization ---*/
   
-  InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-  CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+  SendReceive_Solution(prod, geometry, config);
   
 }
 
-template<class ScalarType>
-unsigned long CSysMatrix<ScalarType>::LU_SGS_Smoother(const CSysVector<ScalarType> & b, CSysVector<ScalarType> & x, CMatrixVectorProduct<ScalarType> & mat_vec, ScalarType tol, unsigned long m, ScalarType *residual, bool monitoring, CGeometry *geometry, CConfig *config) {
+unsigned long CSysMatrix::LU_SGS_Smoother(const CSysVector & b, CSysVector & x, CMatrixVectorProduct & mat_vec, su2double tol, unsigned long m, su2double *residual, bool monitoring, CGeometry *geometry, CConfig *config) {
   
   unsigned long iPoint, iVar;
-  ScalarType omega = 1.0;
-  ScalarType norm_r = 0.0, norm0 = 0.0;
-  int i = 0;
+  su2double omega = 1.0;
   
   /*---  Check the number of iterations requested ---*/
   
@@ -2142,40 +1888,34 @@ unsigned long CSysMatrix<ScalarType>::LU_SGS_Smoother(const CSysVector<ScalarTyp
    of the Jacobian matrix with the current solution (x^k). These must be
    stored in order to perform multiple iterations of the smoother. ---*/
   
-  CSysVector<ScalarType> r(b);
-  CSysVector<ScalarType> A_x(b);
-  CSysVector<ScalarType> xStar(x);
+  CSysVector r(b);
+  CSysVector A_x(b);
+  CSysVector xStar(x);
   
   /*--- Calculate the initial residual, compute norm, and check
    if system is already solved. Recall, r holds b initially. ---*/
   
   mat_vec(x, A_x);
   r -= A_x;
+  su2double norm_r = r.norm();
+  su2double norm0  = b.norm();
+  if ( (norm_r < tol*norm0) || (norm_r < eps) ) {
+    if (rank == MASTER_NODE) cout << "CSysMatrix::LU_SGS_Smoother(): system solved by initial guess." << endl;
+    return 0;
+  }
   
-  /*--- Only compute the residuals in full communication mode. ---*/
+  /*--- Set the norm to the initial initial residual value ---*/
   
-  if (config->GetComm_Level() == COMM_FULL) {
-    
-    norm_r = r.norm();
-    norm0  = b.norm();
-    if ( (norm_r < tol*norm0) || (norm_r < eps) ) {
-      if (rank == MASTER_NODE) cout << "CSysMatrix::LU_SGS_Smoother(): system solved by initial guess." << endl;
-      return 0;
-    }
-    
-    /*--- Set the norm to the initial initial residual value ---*/
-    
-    norm0 = norm_r;
-    
-    /*--- Output header information including initial residual ---*/
-    
-    if ((monitoring) && (rank == MASTER_NODE)) {
-      cout << "\n# " << "LU_SGS Smoother" << " residual history" << endl;
-      cout << "# Residual tolerance target = " << tol << endl;
-      cout << "# Initial residual norm     = " << norm_r << endl;
-      cout << "     " << i << "     " << norm_r/norm0 << endl;
-    }
-    
+  norm0 = norm_r;
+  
+  /*--- Output header information including initial residual ---*/
+  
+  int i = 0;
+  if ((monitoring) && (rank == MASTER_NODE)) {
+    cout << "\n# " << "LU_SGS Smoother" << " residual history" << endl;
+    cout << "# Residual tolerance target = " << tol << endl;
+    cout << "# Initial residual norm     = " << norm_r << endl;
+    cout << "     " << i << "     " << norm_r/norm0 << endl;
   }
   
   /*---  Loop over all smoothing iterations ---*/
@@ -2195,8 +1935,7 @@ unsigned long CSysMatrix<ScalarType>::LU_SGS_Smoother(const CSysVector<ScalarTyp
     
     /*--- MPI Parallelization ---*/
     
-    InitiateComms(xStar, geometry, config, SOLUTION_MATRIX);
-    CompleteComms(xStar, geometry, config, SOLUTION_MATRIX);
+    SendReceive_Solution(xStar, geometry, config);
     
     /*--- Second part of the symmetric iteration: (D+U).x_(1) = D.x* ---*/
     
@@ -2220,8 +1959,7 @@ unsigned long CSysMatrix<ScalarType>::LU_SGS_Smoother(const CSysVector<ScalarTyp
     
     /*--- MPI Parallelization ---*/
     
-    InitiateComms(x, geometry, config, SOLUTION_MATRIX);
-    CompleteComms(x, geometry, config, SOLUTION_MATRIX);
+    SendReceive_Solution(x, geometry, config);
     
     /*--- Update the residual (r^k+1 = b - A*x^k+1) with the new solution ---*/
     
@@ -2230,23 +1968,17 @@ unsigned long CSysMatrix<ScalarType>::LU_SGS_Smoother(const CSysVector<ScalarTyp
     r -= A_x;
     xStar = x;
     
-    /*--- Only compute the residuals in full communication mode. ---*/
+    /*--- Check if solution has converged, else output the relative
+     residual if necessary. ---*/
     
-    if (config->GetComm_Level() == COMM_FULL) {
-      
-      /*--- Check if solution has converged, else output the relative
-       residual if necessary. ---*/
-      
-      norm_r = r.norm();
-      if (norm_r < tol*norm0) break;
-      if (((monitoring) && (rank == MASTER_NODE)) && ((i+1) % 5 == 0))
-        cout << "     " << i << "     " << norm_r/norm0 << endl;
-      
-    }
+    norm_r = r.norm();
+    if (norm_r < tol*norm0) break;
+    if (((monitoring) && (rank == MASTER_NODE)) && ((i+1) % 5 == 0))
+      cout << "     " << i << "     " << norm_r/norm0 << endl;
     
   }
   
-  if ((monitoring) && (rank == MASTER_NODE) && (config->GetComm_Level() == COMM_FULL)) {
+  if ((monitoring) && (rank == MASTER_NODE)) {
     cout << "# LU_SGS smoother final (true) residual:" << endl;
     cout << "# Iteration = " << i << ": |res|/|res0| = "  << norm_r/norm0 << ".\n" << endl;
   }
@@ -2255,8 +1987,7 @@ unsigned long CSysMatrix<ScalarType>::LU_SGS_Smoother(const CSysVector<ScalarTyp
   
 }
 
-template<class ScalarType>
-unsigned short CSysMatrix<ScalarType>::BuildLineletPreconditioner(CGeometry *geometry, CConfig *config) {
+unsigned short CSysMatrix::BuildLineletPreconditioner(CGeometry *geometry, CConfig *config) {
   
   bool *check_Point, add_point;
   unsigned long iEdge, iPoint, jPoint, index_Point, iLinelet, iVertex, next_Point, counter, iElem;
@@ -2417,28 +2148,28 @@ unsigned short CSysMatrix<ScalarType>::BuildLineletPreconditioner(CGeometry *geo
   SU2_MPI::Allreduce(&Local_nLineLets, &Global_nLineLets, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
 #endif
   
-  MeanPoints = SU2_TYPE::Int(ScalarType(Global_nPoints)/ScalarType(Global_nLineLets));
+  MeanPoints = SU2_TYPE::Int(su2double(Global_nPoints)/su2double(Global_nLineLets));
   
   /*--- Memory allocation --*/
   
-  UBlock = new ScalarType* [max_nElem];
-  invUBlock = new ScalarType* [max_nElem];
-  LBlock = new ScalarType* [max_nElem];
-  yVector = new ScalarType* [max_nElem];
-  zVector = new ScalarType* [max_nElem];
-  rVector = new ScalarType* [max_nElem];
+  UBlock = new su2double* [max_nElem];
+  invUBlock = new su2double* [max_nElem];
+  LBlock = new su2double* [max_nElem];
+  yVector = new su2double* [max_nElem];
+  zVector = new su2double* [max_nElem];
+  rVector = new su2double* [max_nElem];
   for (iElem = 0; iElem < max_nElem; iElem++) {
-    UBlock[iElem] = new ScalarType [nVar*nVar];
-    invUBlock[iElem] = new ScalarType [nVar*nVar];
-    LBlock[iElem] = new ScalarType [nVar*nVar];
-    yVector[iElem] = new ScalarType [nVar];
-    zVector[iElem] = new ScalarType [nVar];
-    rVector[iElem] = new ScalarType [nVar];
+    UBlock[iElem] = new su2double [nVar*nVar];
+    invUBlock[iElem] = new su2double [nVar*nVar];
+    LBlock[iElem] = new su2double [nVar*nVar];
+    yVector[iElem] = new su2double [nVar];
+    zVector[iElem] = new su2double [nVar];
+    rVector[iElem] = new su2double [nVar];
   }
   
-  LFBlock = new ScalarType [nVar*nVar];
-  LyVector = new ScalarType [nVar];
-  FzVector = new ScalarType [nVar];
+  LFBlock = new su2double [nVar*nVar];
+  LyVector = new su2double [nVar];
+  FzVector = new su2double [nVar];
   
   /*--- Memory deallocation --*/
   
@@ -2448,13 +2179,12 @@ unsigned short CSysMatrix<ScalarType>::BuildLineletPreconditioner(CGeometry *geo
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::ComputeLineletPreconditioner(const CSysVector<ScalarType> & vec, CSysVector<ScalarType> & prod,
+void CSysMatrix::ComputeLineletPreconditioner(const CSysVector & vec, CSysVector & prod,
                                               CGeometry *geometry, CConfig *config) {
   
   unsigned long iVar, jVar, nElem = 0, iLinelet, im1Point, iPoint, ip1Point, iElem;
   long iElemLoop;
-  ScalarType *block;
+  su2double *block;
   
   if (size == SINGLE_NODE) {
     
@@ -2473,8 +2203,7 @@ void CSysMatrix<ScalarType>::ComputeLineletPreconditioner(const CSysVector<Scala
     
     /*--- MPI Parallelization ---*/
     
-    InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-    CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+    SendReceive_Solution(prod, geometry, config);
     
     /*--- Solve linelet using a Thomas' algorithm ---*/
     
@@ -2543,9 +2272,8 @@ void CSysMatrix<ScalarType>::ComputeLineletPreconditioner(const CSysVector<Scala
     }
     
     /*--- MPI Parallelization ---*/
-        
-    InitiateComms(prod, geometry, config, SOLUTION_MATRIX);
-    CompleteComms(prod, geometry, config, SOLUTION_MATRIX);
+    
+    SendReceive_Solution(prod, geometry, config);
     
   }
   else {
@@ -2554,8 +2282,7 @@ void CSysMatrix<ScalarType>::ComputeLineletPreconditioner(const CSysVector<Scala
   
 }
 
-template<class ScalarType>
-void CSysMatrix<ScalarType>::ComputeResidual(const CSysVector<ScalarType> & sol, const CSysVector<ScalarType> & f, CSysVector<ScalarType> & res) {
+void CSysMatrix::ComputeResidual(const CSysVector & sol, const CSysVector & f, CSysVector & res) {
   
   unsigned long iPoint, iVar;
   
@@ -2567,31 +2294,3 @@ void CSysMatrix<ScalarType>::ComputeResidual(const CSysVector<ScalarType> & sol,
   }
   
 }
-
-/*--- Explicit instantiations ---*/
-template class CSysMatrix<su2double>;
-template void  CSysMatrix<su2double>::SendReceive_Solution(CSysVector<su2double>&, CGeometry*, CConfig*);
-template void  CSysMatrix<su2double>::InitiateComms(CSysVector<su2double>&, CGeometry*, CConfig*, unsigned short);
-template void  CSysMatrix<su2double>::CompleteComms(CSysVector<su2double>&, CGeometry*, CConfig*, unsigned short);
-template class CSysMatrixVectorProduct<su2double>;
-template class CSysMatrixVectorProductTransposed<su2double>;
-template class CJacobiPreconditioner<su2double>;
-template class CILUPreconditioner<su2double>;
-template class CLU_SGSPreconditioner<su2double>;
-template class CLineletPreconditioner<su2double>;
-
-#ifdef CODI_REVERSE_TYPE
-template class CSysMatrix<passivedouble>;
-template void  CSysMatrix<passivedouble>::SendReceive_Solution(CSysVector<passivedouble>&, CGeometry*, CConfig*);
-template void  CSysMatrix<passivedouble>::SendReceive_Solution(CSysVector<su2double>&, CGeometry*, CConfig*);
-template void  CSysMatrix<passivedouble>::InitiateComms(CSysVector<passivedouble>&, CGeometry*, CConfig*, unsigned short);
-template void  CSysMatrix<passivedouble>::InitiateComms(CSysVector<su2double>&, CGeometry*, CConfig*, unsigned short);
-template void  CSysMatrix<passivedouble>::CompleteComms(CSysVector<passivedouble>&, CGeometry*, CConfig*, unsigned short);
-template void  CSysMatrix<passivedouble>::CompleteComms(CSysVector<su2double>&, CGeometry*, CConfig*, unsigned short);
-template class CSysMatrixVectorProduct<passivedouble>;
-template class CSysMatrixVectorProductTransposed<passivedouble>;
-template class CJacobiPreconditioner<passivedouble>;
-template class CILUPreconditioner<passivedouble>;
-template class CLU_SGSPreconditioner<passivedouble>;
-template class CLineletPreconditioner<passivedouble>;
-#endif

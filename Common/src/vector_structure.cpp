@@ -2,7 +2,7 @@
  * \file vector_structure.cpp
  * \brief Main classes required for solving linear systems of equations
  * \author F. Palacios, J. Hicken
- * \version 6.2.0 "Falcon"
+ * \version 6.1.0 "Falcon"
  *
  * The current SU2 release has been coordinated by the
  * SU2 International Developers Society <www.su2devsociety.org>
@@ -18,7 +18,7 @@
  *  - Prof. Edwin van der Weide's group at the University of Twente.
  *  - Lab. of New Concepts in Aeronautics at Tech. Institute of Aeronautics.
  *
- * Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,
+ * Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,
  *                      Tim Albring, and the SU2 contributors.
  *
  * SU2 is free software; you can redistribute it and/or
@@ -37,15 +37,13 @@
 
 #include "../include/vector_structure.hpp"
 
-template<class ScalarType>
-CSysVector<ScalarType>::CSysVector(void) {
+CSysVector::CSysVector(void) {
   
   vec_val = NULL;
   
 }
 
-template<class ScalarType>
-CSysVector<ScalarType>::CSysVector(const unsigned long & size, const ScalarType & val) {
+CSysVector::CSysVector(const unsigned long & size, const su2double & val) {
   
   nElm = size; nElmDomain = size;
   nBlk = nElm; nBlkDomain = nElmDomain;
@@ -58,7 +56,7 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & size, const ScalarType 
     SU2_MPI::Error(string(buf), CURRENT_FUNCTION);
   }
 
-  vec_val = new ScalarType[nElm];
+  vec_val = new su2double[nElm];
   for (unsigned int i = 0; i < nElm; i++)
     vec_val[i] = val;
   
@@ -69,9 +67,8 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & size, const ScalarType 
   
 }
 
-template<class ScalarType>
-CSysVector<ScalarType>::CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar,
-                       const ScalarType & val) {
+CSysVector::CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar,
+                       const su2double & val) {
 
   nElm = numBlk*numVar; nElmDomain = numBlkDomain*numVar;
   nBlk = numBlk; nBlkDomain = numBlkDomain;
@@ -84,7 +81,7 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & numBlk, const unsigned 
     SU2_MPI::Error(string(buf), CURRENT_FUNCTION);
   }
 	
-  vec_val = new ScalarType[nElm];
+  vec_val = new su2double[nElm];
   for (unsigned int i = 0; i < nElm; i++)
     vec_val[i] = val;
   
@@ -95,15 +92,14 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & numBlk, const unsigned 
   
 }
 
-template<class ScalarType>
-CSysVector<ScalarType>::CSysVector(const CSysVector<ScalarType> & u) {
+CSysVector::CSysVector(const CSysVector & u) {
   
   /*--- Copy size information, allocate memory, and initialize values ---*/
   nElm = u.nElm; nElmDomain = u.nElmDomain;
   nBlk = u.nBlk; nBlkDomain = u.nBlkDomain;
   nVar = u.nVar;
   
-  vec_val = new ScalarType[nElm];
+  vec_val = new su2double[nElm];
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] = u.vec_val[i];
   
@@ -113,8 +109,7 @@ CSysVector<ScalarType>::CSysVector(const CSysVector<ScalarType> & u) {
   
 }
 
-template<class ScalarType>
-CSysVector<ScalarType>::CSysVector(const unsigned long & size, const ScalarType* u_array) {
+CSysVector::CSysVector(const unsigned long & size, const su2double* u_array) {
   
   nElm = size; nElmDomain = size;
   nBlk = nElm; nBlkDomain = nElmDomain;
@@ -127,7 +122,7 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & size, const ScalarType*
     SU2_MPI::Error(string(buf), CURRENT_FUNCTION);
   }
 
-  vec_val = new ScalarType[nElm];
+  vec_val = new su2double[nElm];
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] = u_array[i];
 
@@ -138,9 +133,8 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & size, const ScalarType*
   
 }
 
-template<class ScalarType>
-CSysVector<ScalarType>::CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar,
-                       const ScalarType* u_array) {
+CSysVector::CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar,
+                       const su2double* u_array) {
 
   nElm = numBlk*numVar; nElmDomain = numBlkDomain*numVar;
   nBlk = numBlk; nBlkDomain = numBlkDomain;
@@ -153,7 +147,7 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & numBlk, const unsigned 
     SU2_MPI::Error(string(buf), CURRENT_FUNCTION);
   }
 
-  vec_val = new ScalarType[nElm];
+  vec_val = new su2double[nElm];
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] = u_array[i];
 
@@ -164,8 +158,7 @@ CSysVector<ScalarType>::CSysVector(const unsigned long & numBlk, const unsigned 
   
 }
 
-template<class ScalarType>
-CSysVector<ScalarType>::~CSysVector() {
+CSysVector::~CSysVector() {
   delete [] vec_val;
   
   nElm = 0; nElmDomain = 0;
@@ -174,8 +167,7 @@ CSysVector<ScalarType>::~CSysVector() {
   
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::Initialize(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar, const ScalarType & val) {
+void CSysVector::Initialize(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar, const su2double & val) {
   
   nElm = numBlk*numVar; nElmDomain = numBlkDomain*numVar;
   nBlk = numBlk; nBlkDomain = numBlkDomain;
@@ -188,7 +180,7 @@ void CSysVector<ScalarType>::Initialize(const unsigned long & numBlk, const unsi
     SU2_MPI::Error(string(buf), CURRENT_FUNCTION);
   }
 	
-  vec_val = new ScalarType[nElm];
+  vec_val = new su2double[nElm];
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] = val;
   
@@ -199,8 +191,7 @@ void CSysVector<ScalarType>::Initialize(const unsigned long & numBlk, const unsi
   
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::Equals_AX(const ScalarType & a, CSysVector<ScalarType> & x) {
+void CSysVector::Equals_AX(const su2double & a, CSysVector & x) {
   /*--- check that *this and x are compatible ---*/
   if (nElm != x.nElm) {
     cerr << "CSysVector::Equals_AX(): " << "sizes do not match";
@@ -210,8 +201,7 @@ void CSysVector<ScalarType>::Equals_AX(const ScalarType & a, CSysVector<ScalarTy
     vec_val[i] = a * x.vec_val[i];
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::Plus_AX(const ScalarType & a, CSysVector<ScalarType> & x) {
+void CSysVector::Plus_AX(const su2double & a, CSysVector & x) {
   /*--- check that *this and x are compatible ---*/
   if (nElm != x.nElm) {
     SU2_MPI::Error("Sizes do not match", CURRENT_FUNCTION);
@@ -220,8 +210,7 @@ void CSysVector<ScalarType>::Plus_AX(const ScalarType & a, CSysVector<ScalarType
     vec_val[i] += a * x.vec_val[i];
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::Equals_AX_Plus_BY(const ScalarType & a, CSysVector<ScalarType> & x, const ScalarType & b, CSysVector<ScalarType> & y) {
+void CSysVector::Equals_AX_Plus_BY(const su2double & a, CSysVector & x, const su2double & b, CSysVector & y) {
   /*--- check that *this, x and y are compatible ---*/
   if ((nElm != x.nElm) || (nElm != y.nElm)) {
     SU2_MPI::Error("Sizes do not match", CURRENT_FUNCTION);
@@ -230,23 +219,20 @@ void CSysVector<ScalarType>::Equals_AX_Plus_BY(const ScalarType & a, CSysVector<
     vec_val[i] = a * x.vec_val[i] + b * y.vec_val[i];
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> & CSysVector<ScalarType>::operator=(const CSysVector<ScalarType> & u) {
+CSysVector & CSysVector::operator=(const CSysVector & u) {
   
   /*--- check if self-assignment, otherwise perform deep copy ---*/
   if (this == &u) return *this;
-
-  /*--- determine if (re-)allocation is needed ---*/
-  if (nElm != u.nElm && vec_val != NULL) {delete [] vec_val; vec_val = NULL;}
-  if (vec_val == NULL) vec_val = new ScalarType[u.nElm];
-
-  /*--- copy ---*/
+  
+  delete [] vec_val; // in case the size is different
   nElm = u.nElm;
   nElmDomain = u.nElmDomain;
+  
   nBlk = u.nBlk;
 	nBlkDomain = u.nBlkDomain;
+  
   nVar = u.nVar;
-
+  vec_val = new su2double[nElm];
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] = u.vec_val[i];
   
@@ -257,24 +243,21 @@ CSysVector<ScalarType> & CSysVector<ScalarType>::operator=(const CSysVector<Scal
   return *this;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> & CSysVector<ScalarType>::operator=(const ScalarType & val) {
+CSysVector & CSysVector::operator=(const su2double & val) {
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] = val;
   return *this;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> CSysVector<ScalarType>::operator+(const CSysVector<ScalarType> & u) const {
+CSysVector CSysVector::operator+(const CSysVector & u) const {
   
   /*--- Use copy constructor and compound addition-assignment ---*/
-  CSysVector<ScalarType> sum(*this);
+  CSysVector sum(*this);
   sum += u;
   return sum;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> & CSysVector<ScalarType>::operator+=(const CSysVector<ScalarType> & u) {
+CSysVector & CSysVector::operator+=(const CSysVector & u) {
   
   /*--- Check for consistent sizes, then add elements ---*/
   if (nElm != u.nElm) {
@@ -285,17 +268,15 @@ CSysVector<ScalarType> & CSysVector<ScalarType>::operator+=(const CSysVector<Sca
   return *this;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> CSysVector<ScalarType>::operator-(const CSysVector<ScalarType> & u) const {
+CSysVector CSysVector::operator-(const CSysVector & u) const {
   
   /*--- Use copy constructor and compound subtraction-assignment ---*/
-  CSysVector<ScalarType> diff(*this);
+  CSysVector diff(*this);
   diff -= u;
   return diff;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> & CSysVector<ScalarType>::operator-=(const CSysVector<ScalarType> & u) {
+CSysVector & CSysVector::operator-=(const CSysVector & u) {
   
   /*--- Check for consistent sizes, then subtract elements ---*/
   if (nElm != u.nElm) {
@@ -306,36 +287,32 @@ CSysVector<ScalarType> & CSysVector<ScalarType>::operator-=(const CSysVector<Sca
   return *this;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> CSysVector<ScalarType>::operator*(const ScalarType & val) const {
+CSysVector CSysVector::operator*(const su2double & val) const {
   
   /*--- use copy constructor and compound scalar
    multiplication-assignment ---*/
-  CSysVector<ScalarType> prod(*this);
+  CSysVector prod(*this);
   prod *= val;
   return prod;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> operator*(const ScalarType & val, const CSysVector<ScalarType> & u) {
+CSysVector operator*(const su2double & val, const CSysVector & u) {
   
   /*--- use copy constructor and compound scalar
    multiplication-assignment ---*/
-  CSysVector<ScalarType> prod(u);
+  CSysVector prod(u);
   prod *= val;
   return prod;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> & CSysVector<ScalarType>::operator*=(const ScalarType & val) {
+CSysVector & CSysVector::operator*=(const su2double & val) {
   
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] *= val;
   return *this;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> CSysVector<ScalarType>::operator/(const ScalarType & val) const {
+CSysVector CSysVector::operator/(const su2double & val) const {
   
   /*--- use copy constructor and compound scalar
    division-assignment ---*/
@@ -344,87 +321,75 @@ CSysVector<ScalarType> CSysVector<ScalarType>::operator/(const ScalarType & val)
   return quotient;
 }
 
-template<class ScalarType>
-CSysVector<ScalarType> & CSysVector<ScalarType>::operator/=(const ScalarType & val) {
+CSysVector & CSysVector::operator/=(const su2double & val) {
   
   for (unsigned long i = 0; i < nElm; i++)
     vec_val[i] /= val;
   return *this;
 }
 
-template<class ScalarType>
-ScalarType CSysVector<ScalarType>::norm() const {
+su2double CSysVector::norm() const {
   
   /*--- just call dotProd on this*, then sqrt ---*/
-  ScalarType val = dotProd(*this, *this);
+  su2double val = dotProd(*this, *this);
   if (val < 0.0) {
     SU2_MPI::Error("Inner product of CSysVector is negative", CURRENT_FUNCTION);
   }
   return sqrt(val);
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::CopyToArray(ScalarType* u_array) {
+void CSysVector::CopyToArray(su2double* u_array) {
   
   for (unsigned long i = 0; i < nElm; i++)
     u_array[i] = vec_val[i];
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::AddBlock(unsigned long val_ipoint, ScalarType *val_residual) {
+void CSysVector::AddBlock(unsigned long val_ipoint, su2double *val_residual) {
   unsigned short iVar;
   
   for (iVar = 0; iVar < nVar; iVar++)
     vec_val[val_ipoint*nVar+iVar] += val_residual[iVar];
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::SubtractBlock(unsigned long val_ipoint, ScalarType *val_residual) {
+void CSysVector::SubtractBlock(unsigned long val_ipoint, su2double *val_residual) {
   unsigned short iVar;
   
   for (iVar = 0; iVar < nVar; iVar++)
     vec_val[val_ipoint*nVar+iVar] -= val_residual[iVar];
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::SetBlock(unsigned long val_ipoint, ScalarType *val_residual) {
+void CSysVector::SetBlock(unsigned long val_ipoint, su2double *val_residual) {
   unsigned short iVar;
   
   for (iVar = 0; iVar < nVar; iVar++)
     vec_val[val_ipoint*nVar+iVar] = val_residual[iVar];
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::SetBlock(unsigned long val_ipoint, unsigned short val_var, ScalarType val_residual) {
+void CSysVector::SetBlock(unsigned long val_ipoint, unsigned short val_var, su2double val_residual) {
 
   vec_val[val_ipoint*nVar+val_var] = val_residual;
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::SetBlock_Zero(unsigned long val_ipoint) {
+void CSysVector::SetBlock_Zero(unsigned long val_ipoint) {
   unsigned short iVar;
 
   for (iVar = 0; iVar < nVar; iVar++)
     vec_val[val_ipoint*nVar+iVar] = 0.0;
 }
 
-template<class ScalarType>
-void CSysVector<ScalarType>::SetBlock_Zero(unsigned long val_ipoint, unsigned short val_var) {
+void CSysVector::SetBlock_Zero(unsigned long val_ipoint, unsigned short val_var) {
     vec_val[val_ipoint*nVar+val_var] = 0.0;
 }
 
-template<class ScalarType>
-ScalarType CSysVector<ScalarType>::GetBlock(unsigned long val_ipoint, unsigned short val_var) {
+su2double CSysVector::GetBlock(unsigned long val_ipoint, unsigned short val_var) {
   return vec_val[val_ipoint*nVar + val_var];
 }
 
-template<class ScalarType>
-ScalarType *CSysVector<ScalarType>::GetBlock(unsigned long val_ipoint) {
+su2double *CSysVector::GetBlock(unsigned long val_ipoint) {
   return &vec_val[val_ipoint*nVar];
 }
 
-template<class ScalarType>
-ScalarType dotProd(const CSysVector<ScalarType> & u, const CSysVector<ScalarType> & v) {
+su2double dotProd(const CSysVector & u, const CSysVector & v) {
   
   /*--- check for consistent sizes ---*/
   if (u.nElm != v.nElm) {
@@ -433,27 +398,16 @@ ScalarType dotProd(const CSysVector<ScalarType> & u, const CSysVector<ScalarType
   
   /*--- find local inner product and, if a parallel run, sum over all
    processors (we use nElemDomain instead of nElem) ---*/
-  ScalarType loc_prod = 0.0;
+  su2double loc_prod = 0.0;
   for (unsigned long i = 0; i < u.nElmDomain; i++)
     loc_prod += u.vec_val[i]*v.vec_val[i];
-  ScalarType prod = 0.0;
+  su2double prod = 0.0;
   
 #ifdef HAVE_MPI
-  SelectMPIWrapper<ScalarType>::W::Allreduce(&loc_prod, &prod, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  SU2_MPI::Allreduce(&loc_prod, &prod, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 #else
   prod = loc_prod;
 #endif
   
   return prod;
 }
-
-/*--- Explicit instantiations ---*/
-template class CSysVector<su2double>;
-template CSysVector<su2double> operator*(const su2double&, const CSysVector<su2double>&);
-template su2double dotProd<su2double>(const CSysVector<su2double> & u, const CSysVector<su2double> & v);
-
-#ifdef CODI_REVERSE_TYPE
-template class CSysVector<passivedouble>;
-template CSysVector<passivedouble> operator*(const passivedouble&, const CSysVector<passivedouble>&);
-template passivedouble dotProd<passivedouble>(const CSysVector<passivedouble> & u, const CSysVector<passivedouble> & v);
-#endif

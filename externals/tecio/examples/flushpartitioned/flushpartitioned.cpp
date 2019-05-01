@@ -764,7 +764,6 @@ int32_t createData(
                 free(ghostNodes[ptn - 1]);
                 free(gNPartitions[ptn - 1]);
                 free(gNPNodes[ptn - 1]);
-                free(ghostCells[ptn - 1]);
             }
 
             if (timeStep == 0)

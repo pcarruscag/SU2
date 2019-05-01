@@ -3,7 +3,7 @@
  * \brief Headers for the classes related to linear solvers (CG, FGMRES, etc)
  *        The subroutines and functions are in the <i>linear_solvers_structure.cpp</i> file.
  * \author F. Palacios, J. Hicken, T. Economon
- * \version 6.2.0 "Falcon"
+ * \version 6.1.0 "Falcon"
  *
  * The current SU2 release has been coordinated by the
  * SU2 International Developers Society <www.su2devsociety.org>
@@ -19,7 +19,7 @@
  *  - Prof. Edwin van der Weide's group at the University of Twente.
  *  - Lab. of New Concepts in Aeronautics at Tech. Institute of Aeronautics.
  *
- * Copyright 2012-2019, Francisco D. Palacios, Thomas D. Economon,
+ * Copyright 2012-2018, Francisco D. Palacios, Thomas D. Economon,
  *                      Tim Albring, and the SU2 contributors.
  *
  * SU2 is free software; you can redistribute it and/or
@@ -50,10 +50,6 @@
 
 using namespace std;
 
-/*--- Forward declaration of template friend functions. ---*/
-template<class T> class CSysVector;
-template<class T> T dotProd(const CSysVector<T> & u, const CSysVector<T> & v);
-
 /*!
  * \class CSysVector
  * \brief Class for holding and manipulating vectors needed by linear solvers
@@ -64,7 +60,6 @@ template<class T> T dotProd(const CSysVector<T> & u, const CSysVector<T> & v);
  * use a block storage scheme rather than a continuous storage
  * scheme).
  */
-template<class ScalarType>
 class CSysVector {
   
 private:
@@ -76,7 +71,7 @@ private:
 	unsigned short nVar; /*!< \brief number of elements in a block */
 	unsigned long nBlk; /*!< \brief number of blocks (or number of blocks on this processor) */
 	unsigned long nBlkDomain; /*!< \brief number of blocks (or number of blocks on this processor without Ghost cells) */
-  ScalarType* vec_val; /*!< \brief storage for the element values */
+  su2double* vec_val; /*!< \brief storage for the element values */
   
 public:
   
@@ -90,7 +85,7 @@ public:
    * \param[in] size - number of elements locally
    * \param[in] val - default value for elements
    */
-  CSysVector(const unsigned long & size, const ScalarType & val = 0.0);
+  CSysVector(const unsigned long & size, const su2double & val = 0.0);
   
   /*!
    * \brief constructor of the class.
@@ -99,7 +94,7 @@ public:
    * \param[in] numVar - number of variables in each block
    * \param[in] val - default value for elements
    */
-  CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar, const ScalarType & val = 0.0);
+  CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar, const su2double & val = 0.0);
   
   /*!
    * \brief copy constructor of the class.
@@ -117,7 +112,7 @@ public:
    * \param[in] size - number of elements locally
    * \param[in] u_array - vector stored as array being copied
    */
-  explicit CSysVector(const unsigned long & size, const ScalarType* u_array);
+  explicit CSysVector(const unsigned long & size, const su2double* u_array);
   
   /*!
    * \brief constructor from array
@@ -127,7 +122,7 @@ public:
    * \param[in] u_array - vector stored as array being copied
    */
   explicit CSysVector(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar,
-                      const ScalarType* u_array);
+                      const su2double* u_array);
   
   /*!
    * \brief class destructor
@@ -141,17 +136,12 @@ public:
    * \param[in] numVar - number of variables in each block
    * \param[in] val - default value for elements
    */
-  void Initialize(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar, const ScalarType & val = 0.0);
+  void Initialize(const unsigned long & numBlk, const unsigned long & numBlkDomain, const unsigned short & numVar, const su2double & val = 0.0);
   
   /*!
    * \brief return the number of local elements in the CSysVector
    */
   unsigned long GetLocSize() const;
-  
-  /*!
-   * \brief return the number of local elements in the CSysVector without ghost cells
-   */
-  unsigned long GetNElmDomain() const;
   
   /*!
    * \brief return the size of the CSysVector (over all processors)
@@ -178,14 +168,14 @@ public:
    * \param[in] a - scalar factor for x
    * \param[in] x - CSysVector that is being scaled
    */
-  void Equals_AX(const ScalarType & a, CSysVector & x);
+  void Equals_AX(const su2double & a, CSysVector & x);
   
   /*!
    * \brief adds a scaled CSysVector to calling CSysVector
    * \param[in] a - scalar factor for x
    * \param[in] x - CSysVector that is being scaled
    */
-  void Plus_AX(const ScalarType & a, CSysVector & x);
+  void Plus_AX(const su2double & a, CSysVector & x);
   
   /*!
    * \brief general linear combination of two CSysVectors
@@ -194,7 +184,7 @@ public:
    * \param[in] b - scalar factor for y
    * \param[in] y - second CSysVector in linear combination
    */
-  void Equals_AX_Plus_BY(const ScalarType & a, CSysVector & x, const ScalarType & b, CSysVector & y);
+  void Equals_AX_Plus_BY(const su2double & a, CSysVector & x, const su2double & b, CSysVector & y);
   
   /*!
    * \brief assignment operator with deep copy
@@ -206,7 +196,7 @@ public:
    * \brief CSysVector=su2double assignment operator
    * \param[in] val - value assigned to each element of CSysVector
    */
-  CSysVector & operator=(const ScalarType & val);
+  CSysVector & operator=(const su2double & val);
   
   /*!
    * \brief addition operator
@@ -236,64 +226,71 @@ public:
    * \brief vector * scalar multiplication operator
    * \param[in] val - value to multiply *this by
    */
-  CSysVector operator*(const ScalarType & val) const;
+  CSysVector operator*(const su2double & val) const;
+  
+  /*!
+   * \brief scalar * vector multiplication operator
+   * \param[in] val - scalar value to multiply by
+   * \param[in] u - CSysVector having its elements scaled
+   */
+  friend CSysVector operator*(const su2double & val, const CSysVector & u);
   
   /*!
    * \brief compound scalar multiplication-assignment operator
    * \param[in] val - value to multiply calling object by
    */
-  CSysVector & operator*=(const ScalarType & val);
+  CSysVector & operator*=(const su2double & val);
   
   /*!
    * \brief vector-scalar division operator (no scalar/vector operator)
    * \param[in] val - value to divide elements of *this by
    */
-  CSysVector operator/(const ScalarType & val) const;
+  CSysVector operator/(const su2double & val) const;
   
   /*!
    * \brief compound scalar division-assignment operator
    * \param[in] val - value to divide elements of calling object by
    */
-  CSysVector & operator/=(const ScalarType & val);
+  CSysVector & operator/=(const su2double & val);
   
   /*!
    * \brief indexing operator with assignment permitted
    * \param[in] i = local index to access
    */
-  ScalarType & operator[](const unsigned long & i);
+  su2double & operator[](const unsigned long & i);
   
   /*!
    * \brief indexing operator with assignment not permitted
    * \param[in] i = local index to access
    */
-  const ScalarType & operator[](const unsigned long & i) const;
+  const su2double & operator[](const unsigned long & i) const;
     
   /*!
    * \brief the L2 norm of the CSysVector
    * \result the L2 norm
    */
-  ScalarType norm() const;
+  su2double norm() const;
   
   /*!
    * \brief copies the contents of the calling CSysVector into an array
    * \param[out] u_array - array into which information is being copied
    * \pre u_array must be allocated and have the same size as CSysVector
    */
-  void CopyToArray(ScalarType* u_array);
+  void CopyToArray(su2double* u_array);
   
   /*!
 	 * \brief Subtract val_residual to the residual.
 	 * \param[in] val_ipoint - index of the point where subtract the residual.
    * \param[in] val_residual - Value to subtract to the residual.
 	 */
-  void SubtractBlock(unsigned long val_ipoint, ScalarType *val_residual);
+  void SubtractBlock(unsigned long val_ipoint, su2double *val_residual);
   
   /*!
 	 * \brief Add val_residual to the residual.
 	 * \param[in] val_ipoint - index of the point where add the residual.
    * \param[in] val_residual - Value to add to the residual.
 	 */
-  void AddBlock(unsigned long val_ipoint, ScalarType *val_residual);
+  void AddBlock(unsigned long val_ipoint, su2double *val_residual);
   
   /*!
 	 * \brief Set val_residual to the residual.
@@ -301,14 +298,14 @@ public:
    * \param[in] val_var - inde of the residual to be set.
    * \param[in] val_residual - Value to set to the residual.
 	 */
-  void SetBlock(unsigned long val_ipoint, unsigned short val_var, ScalarType val_residual);
+  void SetBlock(unsigned long val_ipoint, unsigned short val_var, su2double val_residual);
   
   /*!
 	 * \brief Set val_residual to the residual.
 	 * \param[in] val_ipoint - index of the point where set the residual.
    * \param[in] val_residual - Value to set to the residual.
 	 */
-  void SetBlock(unsigned long val_ipoint, ScalarType *val_residual);
+  void SetBlock(unsigned long val_ipoint, su2double *val_residual);
   
   /*!
 	 * \brief Set the residual to zero.
@@ -328,7 +325,7 @@ public:
 	 * \param[in] val_ipoint - index of the point where set the residual.
    * \return Pointer to the residual.
 	 */
-  ScalarType *GetBlock(unsigned long val_ipoint);
+  su2double *GetBlock(unsigned long val_ipoint);
 	
   /*!
 	 * \brief Get the value of the residual.
@@ -336,30 +333,17 @@ public:
    * \param[in] val_var - inde of the residual to be set.
    * \return Value of the residual.
 	 */
-  ScalarType GetBlock(unsigned long val_ipoint, unsigned short val_var);
+  su2double GetBlock(unsigned long val_ipoint, unsigned short val_var);
+  
   
   /*!
    * \brief dot-product between two CSysVectors
    * \param[in] u - first CSysVector in dot product
    * \param[in] v - second CSysVector in dot product
    */
-  friend ScalarType dotProd<ScalarType>(const CSysVector & u, const CSysVector & v);
+  friend su2double dotProd(const CSysVector & u, const CSysVector & v);
   
-  /*!
-   * \brief Set our values (resizing if required) by copying from other, the derivative information is lost.
-   * \param[in] other - source CSysVector
-   */
-  template<class T>
-  void PassiveCopy(const CSysVector<T>& other);
 };
-
-/*!
- * \brief scalar * vector multiplication operator
- * \param[in] val - scalar value to multiply by
- * \param[in] u - CSysVector having its elements scaled
- */
-template<class ScalarType>
-CSysVector<ScalarType> operator*(const ScalarType & val, const CSysVector<ScalarType> & u);
 
 /*!
  * \class CMatrixVectorProduct
@@ -377,15 +361,13 @@ CSysVector<ScalarType> operator*(const ScalarType & val, const CSysVector<Scalar
  * handle the different types of matrix-vector products and still be
  * passed to a single implementation of the Krylov solvers.
  */
-template<class ScalarType>
 class CMatrixVectorProduct {
 public:
   virtual ~CMatrixVectorProduct() = 0; ///< class destructor
-  virtual void operator()(const CSysVector<ScalarType> & u, CSysVector<ScalarType> & v)
+  virtual void operator()(const CSysVector & u, CSysVector & v)
   const = 0; ///< matrix-vector product operation
 };
-template<class ScalarType>
-inline CMatrixVectorProduct<ScalarType>::~CMatrixVectorProduct() {}
+inline CMatrixVectorProduct::~CMatrixVectorProduct() {}
 
 /*!
  * \class CPreconditioner
@@ -395,14 +377,12 @@ inline CMatrixVectorProduct<ScalarType>::~CMatrixVectorProduct() {}
  * See the remarks regarding the CMatrixVectorProduct class.  The same
  * idea applies here to the preconditioning operation.
  */
-template<class ScalarType>
 class CPreconditioner {
 public:
   virtual ~CPreconditioner() = 0; ///< class destructor
-  virtual void operator()(const CSysVector<ScalarType> & u, CSysVector<ScalarType> & v)
+  virtual void operator()(const CSysVector & u, CSysVector & v)
   const = 0; ///< preconditioning operation
 };
-template<class ScalarType>
-inline CPreconditioner<ScalarType>::~CPreconditioner() {}
+inline CPreconditioner::~CPreconditioner() {}
 
 #include "vector_structure.inl"

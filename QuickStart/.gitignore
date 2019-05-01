@@ -7,6 +7,5 @@
 *.dat
 *.csv
 *.plt
-*.szplt
 *.vtk
 config_*.cfg

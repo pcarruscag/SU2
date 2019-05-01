@@ -241,12 +241,6 @@ int main(int argc, char** argv)
     #if defined TECIOMPI
         MPI_Finalize();
     #endif
-
-    delete[] x;
-    delete[] y;
-    delete[] z;
-    delete[] p;
-
     return 0;
 }
 

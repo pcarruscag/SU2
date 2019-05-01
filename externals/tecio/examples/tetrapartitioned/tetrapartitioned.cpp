@@ -255,8 +255,6 @@ int main(int argc, char** argv)
             free(gNPartitions[ptn - 1]);
         if (gNPNodes[ptn - 1])
             free(gNPNodes[ptn - 1]);
-        if (ghostCells[ptn - 1])
-            free(ghostCells[ptn - 1]);
         /*
          * Write out the field data.
          */
