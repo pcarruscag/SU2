@@ -11613,20 +11613,12 @@ void COutput::SetSensitivity_Files(CGeometry ***geometry, CConfig **config, unsi
 
     for (iMarker = 0; iMarker < nMarker; iMarker++) {
 
-<<<<<<< HEAD
       if((config[iZone]->GetMarker_All_KindBC(iMarker) == HEAT_FLUX )   ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == EULER_WALL )  ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == ISOTHERMAL )  ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == CHT_WALL_INTERFACE ) ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == CLAMPED_BOUNDARY ) ||
          (config[iZone]->GetMarker_All_KindBC(iMarker) == LOAD_BOUNDARY )) {
-=======
-      if((config[iZone]->GetMarker_All_KindBC(iMarker) == HEAT_FLUX ) ||
-         (config[iZone]->GetMarker_All_KindBC(iMarker) == EULER_WALL ) ||
-         (config[iZone]->GetMarker_All_KindBC(iMarker) == ISOTHERMAL ) ||
-         (config[iZone]->GetMarker_All_KindBC(iMarker) == CHT_WALL_INTERFACE )) {
-
->>>>>>> develop
         
         nVertex = geometry[iZone][INST_0]->GetnVertex(iMarker);
 
