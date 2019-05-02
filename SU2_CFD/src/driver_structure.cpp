@@ -2099,7 +2099,10 @@ void CDriver::Numerics_Preprocessing(CNumerics *****numerics_container,
           }
           
           for (iMGlevel = 1; iMGlevel <= config->GetnMGLevels(); iMGlevel++)
-            numerics_container[val_iInst][iMGlevel][FLOW_SOL][CONV_TERM] = new CCentLax_Flow(nDim, nVar_Flow, config);
+            switch (config->GetKind_Centered_Flow()) {
+              case JST: numerics_container[val_iInst][iMGlevel][FLOW_SOL][CONV_TERM] = new CCentJST_Flow(nDim, nVar_Flow, config); break;
+              default : numerics_container[val_iInst][iMGlevel][FLOW_SOL][CONV_TERM] = new CCentLax_Flow(nDim, nVar_Flow, config);
+            }
           
           /*--- Definition of the boundary condition method ---*/
           for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); iMGlevel++)
