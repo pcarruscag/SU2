@@ -9087,7 +9087,7 @@ CElasticityMovement::CElasticityMovement(CGeometry *geometry, CConfig *config) :
       element_container[EL_TETRA] = new CTETRA1(nDim, config);
       element_container[EL_HEXA] = new CHEXA8(nDim, config);
       element_container[EL_PYRAM] = new CHEXA8(nDim, config);
-      element_container[EL_PRISM] = new CHEXA8(nDim, config);
+      element_container[EL_PRISM] = new CPRISM6(nDim, config);
     }
 
     /*--- Term ij of the Jacobian ---*/
