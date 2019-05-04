@@ -204,8 +204,8 @@ void CCentJST_Flow::ComputeResidual(su2double *val_residual, su2double **val_Jac
 
   if (implicit) {
 
-    cte_0 = (Epsilon_2 + Epsilon_4*su2double(Neighbor_i+1))*StretchingFactor*MeanLambda;
-    cte_1 = (Epsilon_2 + Epsilon_4*su2double(Neighbor_j+1))*StretchingFactor*MeanLambda;
+    cte_0 = (Epsilon_2 + Epsilon_4*su2double(Neighbor_i+1))*StretchingFactor*MeanLambda*4.0;
+    cte_1 = (Epsilon_2 + Epsilon_4*su2double(Neighbor_j+1))*StretchingFactor*MeanLambda*4.0;
     
     for (iVar = 0; iVar < (nVar-1); iVar++) {
       val_Jacobian_i[iVar][iVar] += cte_0;
