@@ -2257,6 +2257,8 @@ void CSysMatrix<ScalarType>::PastixInitialize(CGeometry *geometry, CConfig *conf
 
   /*--- Set default parameter values ---*/
 
+  pastix_int_t incomplete = pastix_data.iparm[IPARM_INCOMPLETE];
+
   pastix_data.iparm[IPARM_MODIFY_PARAMETER] = API_NO;
   pastix_data.run();
 
@@ -2279,6 +2281,8 @@ void CSysMatrix<ScalarType>::PastixInitialize(CGeometry *geometry, CConfig *conf
   pastix_data.iparm[IPARM_CSCD_CORRECT]        = API_NO;
   pastix_data.iparm[IPARM_RHSD_CHECK]          = API_NO;
   pastix_data.iparm[IPARM_ORDERING]            = API_ORDER_PTSCOTCH;
+  pastix_data.iparm[IPARM_INCOMPLETE]          = incomplete;
+  pastix_data.iparm[IPARM_LEVEL_OF_FILL]       = pastix_int_t(config->GetPastixFillLvl());
 
   /*--- Prepare sparsity structure ---*/
 
@@ -2383,7 +2387,16 @@ void CSysMatrix<ScalarType>::BuildPastixPreconditioner(CGeometry *geometry, CCon
 #ifdef HAVE_PASTIX
   using namespace PaStiX;
 
+  /*--- Detect a possible change of settings between direct and adjoint that requires a reset ---*/
+  if (pastix_data.isinitialized)
+  if ((kind_fact == PASTIX_ILU) != (pastix_data.iparm[IPARM_INCOMPLETE] == API_YES)) {
+    pastix_data.clean();
+    pastix_data.isinitialized = false;
+    pastix_data.iter = 0;
+  }
+
   pastix_data.verb = config->GetPastixVerbLvl();
+  pastix_data.iparm[IPARM_INCOMPLETE] = (kind_fact == PASTIX_ILU);
 
   PastixInitialize(geometry, config);
 
@@ -2408,18 +2421,13 @@ void CSysMatrix<ScalarType>::BuildPastixPreconditioner(CGeometry *geometry, CCon
 
   /*--- Is factorizing needed on this iteration? ---*/
 
-  if ((kind_fact == PASTIX_ILU) != (pastix_data.iparm[IPARM_INCOMPLETE] == API_YES))
-    pastix_data.iter = 0; // direct and adjoint settings are different, force factorization
-
-  bool factorize;
-  if (config->GetPastixFactFreq() == 0)
-    factorize = (pastix_data.iter == 0); // only on first call
-  else
+  bool factorize = false;
+  if (config->GetPastixFactFreq() != 0)
     factorize = (pastix_data.iter % config->GetPastixFactFreq() == 0);
 
   pastix_data.iter++;
 
-  if (!factorize) return; // No
+  if (pastix_data.isfactorized && !factorize) return; // No
 
   /*--- Yes ---*/
 
@@ -2452,17 +2460,12 @@ void CSysMatrix<ScalarType>::BuildPastixPreconditioner(CGeometry *geometry, CCon
 
   /*--- Set factorization options ---*/
 
-  pastix_data.iparm[IPARM_INCOMPLETE]      = API_NO;
-
   switch (kind_fact) {
   case PASTIX_LDLT: case PASTIX_LDLT_P:
     pastix_data.iparm[IPARM_SYM]           = API_SYM_YES;
     pastix_data.iparm[IPARM_FACTORIZATION] = API_FACT_LDLT;
     break;
-  case PASTIX_ILU:
-    pastix_data.iparm[IPARM_INCOMPLETE]    = API_YES;
-    pastix_data.iparm[IPARM_LEVEL_OF_FILL] = pastix_int_t(config->GetLinear_Solver_ILU_n());
-  case PASTIX_LU: case PASTIX_LU_P:
+  case PASTIX_LU: case PASTIX_LU_P: case PASTIX_ILU:
     pastix_data.iparm[IPARM_SYM]           = API_SYM_NO;
     pastix_data.iparm[IPARM_FACTORIZATION] = API_FACT_LU;
     break;
