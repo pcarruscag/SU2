@@ -2568,6 +2568,23 @@ CPRISM6::CPRISM6(unsigned short val_nDim, CConfig *config)
    * These elements are only used for mesh deformation
    */
 
+  NodalExtrap = new su2double*[nNodes];
+  for (iNode = 0; iNode < nNodes; iNode++) {
+    NodalExtrap[iNode] = new su2double[nGaussPoints];
+    for (iGauss = 0; iGauss < nGaussPoints; ++iGauss)
+      NodalExtrap[iNode][iGauss] = su2double(iGauss == iNode);
+  }
+
+  NodalStress = new su2double*[nNodes];
+  for (iNode = 0; iNode < nNodes; iNode++) {
+    NodalStress[iNode] = new su2double[6];
+  }
+
+  CurrentCoord = new su2double*[nNodes];
+  for (iNode = 0; iNode < nNodes; iNode++) {
+    CurrentCoord [iNode] = new su2double[nDim];
+  }
+
   RefCoord = new su2double*[nNodes];
   for (iNode = 0; iNode < nNodes; iNode++){
     RefCoord [iNode] = new su2double[nDim];
@@ -2593,6 +2610,11 @@ CPRISM6::CPRISM6(unsigned short val_nDim, CConfig *config)
     for (jNode = 0; jNode < nNodes; jNode++){
       Kab [iNode][jNode] = new su2double[nDimSq];
     }
+  }
+  
+  Kt_a = new su2double *[nNodes];
+  for (iNode = 0; iNode < nNodes; iNode++) {
+    Kt_a[iNode] = new su2double [nDim];
   }
 
   /*--- Store the shape functions (they only need to be computed once) ---*/
