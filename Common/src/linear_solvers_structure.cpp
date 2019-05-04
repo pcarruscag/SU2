@@ -385,7 +385,7 @@ unsigned long CSysSolve<ScalarType>::FGMRES_LinSolver(const CSysVector<ScalarTyp
     /*---  System is already solved ---*/
     
     if (rank == MASTER_NODE) cout << "CSysSolve::FGMRES(): system solved by initial guess." << endl;
-    residual = -1.0;
+    (*residual) = -1.0;
     return 0;
   }
   
