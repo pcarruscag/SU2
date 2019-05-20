@@ -677,6 +677,7 @@ void CDiscAdjFEASolver::RegisterObj_Func(CConfig *config){
       ObjFunc_Value = direct_solver->GetTotal_OFRefNode();
       break;
   case VOLUME_FRACTION:
+  case TOPOL_DISCRETENESS:
       ObjFunc_Value = direct_solver->GetTotal_OFVolFrac();
       break;
   default:
@@ -1357,3 +1358,4 @@ void CDiscAdjFEASolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CCo
   Restart_Vars = NULL; Restart_Data = NULL;
 
 }
+
