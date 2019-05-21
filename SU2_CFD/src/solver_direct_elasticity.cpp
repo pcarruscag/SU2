@@ -1398,6 +1398,36 @@ void CFEASolver::Set_ReferenceGeometry(CGeometry *geometry, CConfig *config) {
 
   delete [] Global2Local;
 
+
+  // hack, read loads from file
+  ifstream file;
+  file.open("loads.txt");
+  if(!file.good()) return;
+  
+  int i = 0;
+  while (!file.eof())
+  {
+    string line;
+    getline(file,line);
+    stringstream ss(line);
+    
+    int idx;
+    su2double f[3];
+    
+    ss >> idx >> f[0] >> f[1];
+    if (nDim==3) ss >> f[2];
+    
+    customLoads.globalIndices.push_back(idx);
+    customLoads.glb2loc[idx] = i;
+    for(unsigned short iDim=0; iDim<nDim; ++iDim)
+    {
+      customLoads.loads.push_back(f[iDim]);
+      ++i;
+    }
+  }
+  
+  file.close();
+
 }
 
 
@@ -3215,131 +3245,160 @@ void CFEASolver::BC_Normal_Load(CGeometry *geometry, CSolver **solver_container,
 void CFEASolver::BC_Dir_Load(CGeometry *geometry, CSolver **solver_container, CNumerics *numerics, CConfig *config,
                                         unsigned short val_marker) {
   
-  su2double a[3], b[3], AC[3], BD[3];
-  unsigned long iElem, Point_0 = 0, Point_1 = 0, Point_2 = 0, Point_3=0;
-  su2double *Coord_0 = NULL, *Coord_1= NULL, *Coord_2= NULL, *Coord_3= NULL;
-  su2double Length_Elem = 0.0, Area_Elem = 0.0;
-  unsigned short iDim;
+  // hack, apply loads from file
+  unsigned long iElem, point[4], iPoint;
+  unsigned short iDim, nPt, iPt;
   
-  su2double LoadDirVal = config->GetLoad_Dir_Value(config->GetMarker_All_TagBound(val_marker));
-  su2double LoadDirMult = config->GetLoad_Dir_Multiplier(config->GetMarker_All_TagBound(val_marker));
-  su2double *Load_Dir_Local= config->GetLoad_Dir(config->GetMarker_All_TagBound(val_marker));
-  
-  su2double TotalLoad;
-  
-  su2double CurrentTime=config->GetCurrent_DynTime();
-  su2double Ramp_Time = config->GetRamp_Time();
-
-  su2double ModAmpl = 1.0;
-  
-  ModAmpl = Compute_LoadCoefficient(CurrentTime, Ramp_Time, config);
-
-  TotalLoad = ModAmpl * LoadDirVal * LoadDirMult;
-  
-  /*--- Compute the norm of the vector that was passed in the config file ---*/
-  su2double Norm = 1.0;
-  if (nDim==2) Norm=sqrt(Load_Dir_Local[0]*Load_Dir_Local[0]+Load_Dir_Local[1]*Load_Dir_Local[1]);
-  if (nDim==3) Norm=sqrt(Load_Dir_Local[0]*Load_Dir_Local[0]+Load_Dir_Local[1]*Load_Dir_Local[1]+Load_Dir_Local[2]*Load_Dir_Local[2]);
-  
-  for (iElem = 0; iElem < geometry->GetnElem_Bound(val_marker); iElem++) {
+  for (iElem = 0; iElem < geometry->GetnElem_Bound(val_marker); iElem++)
+  {
+    nPt = nDim;
     
-    Point_0 = geometry->bound[val_marker][iElem]->GetNode(0);     Coord_0 = geometry->node[Point_0]->GetCoord();
-    Point_1 = geometry->bound[val_marker][iElem]->GetNode(1);     Coord_1 = geometry->node[Point_1]->GetCoord();
-    if (nDim == 3) {
-      
-      Point_2 = geometry->bound[val_marker][iElem]->GetNode(2);  Coord_2 = geometry->node[Point_2]->GetCoord();
+    point[0] = geometry->bound[val_marker][iElem]->GetNode(0);
+    point[1] = geometry->bound[val_marker][iElem]->GetNode(1);
+    if (nDim==3) {
+      point[2] = geometry->bound[val_marker][iElem]->GetNode(2);
       if (geometry->bound[val_marker][iElem]->GetVTK_Type() == QUADRILATERAL) {
-        Point_3 = geometry->bound[val_marker][iElem]->GetNode(3);  Coord_3 = geometry->node[Point_3]->GetCoord();
-      }
-      
-    }
-    
-    /*--- Compute area (3D), and length of the surfaces (2D) ---*/
-    
-    if (nDim == 2) {
-      
-      for (iDim = 0; iDim < nDim; iDim++) a[iDim] = Coord_0[iDim]-Coord_1[iDim];
-      
-      Length_Elem = sqrt(a[0]*a[0]+a[1]*a[1]);
-      
-    }
-    
-    if (nDim == 3) {
-      
-      if (geometry->bound[val_marker][iElem]->GetVTK_Type() == TRIANGLE) {
-        
-        for (iDim = 0; iDim < nDim; iDim++) {
-          a[iDim] = Coord_1[iDim]-Coord_0[iDim];
-          b[iDim] = Coord_2[iDim]-Coord_0[iDim];
-        }
-        
-        su2double Ni=0 , Nj=0, Nk=0;
-        
-        Ni=a[1]*b[2]-a[2]*b[1];
-        Nj=-a[0]*b[2]+a[2]*b[0];
-        Nk=a[0]*b[1]-a[1]*b[0];
-        
-        Area_Elem = 0.5*sqrt(Ni*Ni+Nj*Nj+Nk*Nk);
-        
-      }
-      
-      else if (geometry->bound[val_marker][iElem]->GetVTK_Type() == QUADRILATERAL) {
-        
-        for (iDim = 0; iDim < nDim; iDim++) {
-          AC[iDim] = Coord_2[iDim]-Coord_0[iDim];
-          BD[iDim] = Coord_3[iDim]-Coord_1[iDim];
-        }
-        
-        su2double Ni=0 , Nj=0, Nk=0;
-        
-        Ni=AC[1]*BD[2]-AC[2]*BD[1];
-        Nj=-AC[0]*BD[2]+AC[2]*BD[0];
-        Nk=AC[0]*BD[1]-AC[1]*BD[0];
-        
-        Area_Elem = 0.5*sqrt(Ni*Ni+Nj*Nj+Nk*Nk);
-        
+        point[3] = geometry->bound[val_marker][iElem]->GetNode(3);
+        nPt = 4;
       }
     }
     
-    if (nDim == 2) {
-      
-      Residual[0] = (1.0/2.0)*Length_Elem*TotalLoad*Load_Dir_Local[0]/Norm;
-      Residual[1] = (1.0/2.0)*Length_Elem*TotalLoad*Load_Dir_Local[1]/Norm;
-      
-      node[Point_0]->Add_SurfaceLoad_Res(Residual);
-      node[Point_1]->Add_SurfaceLoad_Res(Residual);
-      
-    }
-    
-    else {
-      if (geometry->bound[val_marker][iElem]->GetVTK_Type() == TRIANGLE) {
-        
-        Residual[0] = (1.0/3.0)*Area_Elem*TotalLoad*Load_Dir_Local[0]/Norm;
-        Residual[1] = (1.0/3.0)*Area_Elem*TotalLoad*Load_Dir_Local[1]/Norm;
-        Residual[2] = (1.0/3.0)*Area_Elem*TotalLoad*Load_Dir_Local[2]/Norm;
-        
-        node[Point_0]->Add_SurfaceLoad_Res(Residual);
-        node[Point_1]->Add_SurfaceLoad_Res(Residual);
-        node[Point_2]->Add_SurfaceLoad_Res(Residual);
-        
+    for (iPt=0; iPt<nPt; ++iPt) {
+      iPoint = point[iPt];
+      int glbIdx = geometry->node[iPoint]->GetGlobalIndex();
+      int locIdx = customLoads.glb2loc[glbIdx];
+      for (iDim=0; iDim<nDim; ++iDim) {
+        node[iPoint]->Set_SurfaceLoad_Res(iDim, customLoads.loads[locIdx+iDim]);
       }
-      else if (geometry->bound[val_marker][iElem]->GetVTK_Type() == QUADRILATERAL) {
-        
-        Residual[0] = (1.0/4.0)*Area_Elem*TotalLoad*Load_Dir_Local[0]/Norm;
-        Residual[1] = (1.0/4.0)*Area_Elem*TotalLoad*Load_Dir_Local[1]/Norm;
-        Residual[2] = (1.0/4.0)*Area_Elem*TotalLoad*Load_Dir_Local[2]/Norm;
-        
-        node[Point_0]->Add_SurfaceLoad_Res(Residual);
-        node[Point_1]->Add_SurfaceLoad_Res(Residual);
-        node[Point_2]->Add_SurfaceLoad_Res(Residual);
-        node[Point_3]->Add_SurfaceLoad_Res(Residual);
-        
-      }
-      
     }
-    
   }
+    
   
+//  su2double a[3], b[3], AC[3], BD[3];
+//  unsigned long iElem, Point_0 = 0, Point_1 = 0, Point_2 = 0, Point_3=0;
+//  su2double *Coord_0 = NULL, *Coord_1= NULL, *Coord_2= NULL, *Coord_3= NULL;
+//  su2double Length_Elem = 0.0, Area_Elem = 0.0;
+//  unsigned short iDim;
+//  
+//  su2double LoadDirVal = config->GetLoad_Dir_Value(config->GetMarker_All_TagBound(val_marker));
+//  su2double LoadDirMult = config->GetLoad_Dir_Multiplier(config->GetMarker_All_TagBound(val_marker));
+//  su2double *Load_Dir_Local= config->GetLoad_Dir(config->GetMarker_All_TagBound(val_marker));
+//  
+//  su2double TotalLoad;
+//  
+//  su2double CurrentTime=config->GetCurrent_DynTime();
+//  su2double Ramp_Time = config->GetRamp_Time();
+//
+//  su2double ModAmpl = 1.0;
+//  
+//  ModAmpl = Compute_LoadCoefficient(CurrentTime, Ramp_Time, config);
+//
+//  TotalLoad = ModAmpl * LoadDirVal * LoadDirMult;
+//  
+//  /*--- Compute the norm of the vector that was passed in the config file ---*/
+//  su2double Norm = 1.0;
+//  if (nDim==2) Norm=sqrt(Load_Dir_Local[0]*Load_Dir_Local[0]+Load_Dir_Local[1]*Load_Dir_Local[1]);
+//  if (nDim==3) Norm=sqrt(Load_Dir_Local[0]*Load_Dir_Local[0]+Load_Dir_Local[1]*Load_Dir_Local[1]+Load_Dir_Local[2]*Load_Dir_Local[2]);
+//  
+//  for (iElem = 0; iElem < geometry->GetnElem_Bound(val_marker); iElem++) {
+//    
+//    Point_0 = geometry->bound[val_marker][iElem]->GetNode(0);     Coord_0 = geometry->node[Point_0]->GetCoord();
+//    Point_1 = geometry->bound[val_marker][iElem]->GetNode(1);     Coord_1 = geometry->node[Point_1]->GetCoord();
+//    if (nDim == 3) {
+//      
+//      Point_2 = geometry->bound[val_marker][iElem]->GetNode(2);  Coord_2 = geometry->node[Point_2]->GetCoord();
+//      if (geometry->bound[val_marker][iElem]->GetVTK_Type() == QUADRILATERAL) {
+//        Point_3 = geometry->bound[val_marker][iElem]->GetNode(3);  Coord_3 = geometry->node[Point_3]->GetCoord();
+//      }
+//      
+//    }
+//    
+//    /*--- Compute area (3D), and length of the surfaces (2D) ---*/
+//    
+//    if (nDim == 2) {
+//      
+//      for (iDim = 0; iDim < nDim; iDim++) a[iDim] = Coord_0[iDim]-Coord_1[iDim];
+//      
+//      Length_Elem = sqrt(a[0]*a[0]+a[1]*a[1]);
+//      
+//    }
+//    
+//    if (nDim == 3) {
+//      
+//      if (geometry->bound[val_marker][iElem]->GetVTK_Type() == TRIANGLE) {
+//        
+//        for (iDim = 0; iDim < nDim; iDim++) {
+//          a[iDim] = Coord_1[iDim]-Coord_0[iDim];
+//          b[iDim] = Coord_2[iDim]-Coord_0[iDim];
+//        }
+//        
+//        su2double Ni=0 , Nj=0, Nk=0;
+//        
+//        Ni=a[1]*b[2]-a[2]*b[1];
+//        Nj=-a[0]*b[2]+a[2]*b[0];
+//        Nk=a[0]*b[1]-a[1]*b[0];
+//        
+//        Area_Elem = 0.5*sqrt(Ni*Ni+Nj*Nj+Nk*Nk);
+//        
+//      }
+//      
+//      else if (geometry->bound[val_marker][iElem]->GetVTK_Type() == QUADRILATERAL) {
+//        
+//        for (iDim = 0; iDim < nDim; iDim++) {
+//          AC[iDim] = Coord_2[iDim]-Coord_0[iDim];
+//          BD[iDim] = Coord_3[iDim]-Coord_1[iDim];
+//        }
+//        
+//        su2double Ni=0 , Nj=0, Nk=0;
+//        
+//        Ni=AC[1]*BD[2]-AC[2]*BD[1];
+//        Nj=-AC[0]*BD[2]+AC[2]*BD[0];
+//        Nk=AC[0]*BD[1]-AC[1]*BD[0];
+//        
+//        Area_Elem = 0.5*sqrt(Ni*Ni+Nj*Nj+Nk*Nk);
+//        
+//      }
+//    }
+//    
+//    if (nDim == 2) {
+//      
+//      Residual[0] = (1.0/2.0)*Length_Elem*TotalLoad*Load_Dir_Local[0]/Norm;
+//      Residual[1] = (1.0/2.0)*Length_Elem*TotalLoad*Load_Dir_Local[1]/Norm;
+//      
+//      node[Point_0]->Add_SurfaceLoad_Res(Residual);
+//      node[Point_1]->Add_SurfaceLoad_Res(Residual);
+//      
+//    }
+//    
+//    else {
+//      if (geometry->bound[val_marker][iElem]->GetVTK_Type() == TRIANGLE) {
+//        
+//        Residual[0] = (1.0/3.0)*Area_Elem*TotalLoad*Load_Dir_Local[0]/Norm;
+//        Residual[1] = (1.0/3.0)*Area_Elem*TotalLoad*Load_Dir_Local[1]/Norm;
+//        Residual[2] = (1.0/3.0)*Area_Elem*TotalLoad*Load_Dir_Local[2]/Norm;
+//        
+//        node[Point_0]->Add_SurfaceLoad_Res(Residual);
+//        node[Point_1]->Add_SurfaceLoad_Res(Residual);
+//        node[Point_2]->Add_SurfaceLoad_Res(Residual);
+//        
+//      }
+//      else if (geometry->bound[val_marker][iElem]->GetVTK_Type() == QUADRILATERAL) {
+//        
+//        Residual[0] = (1.0/4.0)*Area_Elem*TotalLoad*Load_Dir_Local[0]/Norm;
+//        Residual[1] = (1.0/4.0)*Area_Elem*TotalLoad*Load_Dir_Local[1]/Norm;
+//        Residual[2] = (1.0/4.0)*Area_Elem*TotalLoad*Load_Dir_Local[2]/Norm;
+//        
+//        node[Point_0]->Add_SurfaceLoad_Res(Residual);
+//        node[Point_1]->Add_SurfaceLoad_Res(Residual);
+//        node[Point_2]->Add_SurfaceLoad_Res(Residual);
+//        node[Point_3]->Add_SurfaceLoad_Res(Residual);
+//        
+//      }
+//      
+//    }
+//    
+//  }
+//  
 }
 
 void CFEASolver::BC_Sine_Load(CGeometry *geometry, CSolver **solver_container, CNumerics *numerics, CConfig *config,
@@ -3685,6 +3744,9 @@ void CFEASolver::ImplicitNewmark_Iteration(CGeometry *geometry, CSolver **solver
   bool incremental_load = config->GetIncrementalLoad();
   
   if (!dynamic) {
+//      
+//    ofstream file;
+//    file.open("loads.txt");
     
     for (iPoint = 0; iPoint < nPointDomain; iPoint++) {
       /*--- Add the external contribution to the residual    ---*/
@@ -3733,8 +3795,13 @@ void CFEASolver::ImplicitNewmark_Iteration(CGeometry *geometry, CSolver **solver
             }
         }
         LinSysRes.AddBlock(iPoint, Res_FSI_Cont);
+//        
+//        file << iPoint << "  " << geometry->node[iPoint]->GetGlobalIndex() << "  " 
+//             << Res_FSI_Cont[0] << "  " << Res_FSI_Cont[1] << endl;
       }
     }
+    
+//    file.close();
     
   }
   
@@ -4551,6 +4618,9 @@ void CFEASolver::Compute_OFRefGeom(CGeometry *geometry, CSolver **solver_contain
   weight_OF = config->GetRefGeom_Penalty() / nTotalPoint;
 
   for (iPoint = 0; iPoint < nPointDomain; iPoint++){
+      
+    // hack, reference geometry of only boundary points
+    su2double isVertex = node[iPoint]->Get_isVertex() ? 1.0 : 0.0;
 
     for (iVar = 0; iVar < nVar; iVar++){
 
@@ -4561,7 +4631,7 @@ void CFEASolver::Compute_OFRefGeom(CGeometry *geometry, CSolver **solver_contain
       current_solution = node[iPoint]->GetSolution(iVar);
 
       /*--- The objective function is the sum of the difference between solution and difference, squared ---*/
-      objective_function += weight_OF * (current_solution - reference_geometry)*(current_solution - reference_geometry);
+      objective_function += isVertex * weight_OF * (current_solution - reference_geometry)*(current_solution - reference_geometry);
     }
 
   }

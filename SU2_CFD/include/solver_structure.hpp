@@ -51,6 +51,7 @@
 #include <set>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unordered_map>
 
 #include "fluid_model.hpp"
 #include "task_definition.hpp"
@@ -11787,6 +11788,14 @@ private:
   su2double ForceCoeff;             /*!< \brief Load transfer coefficient . */
   su2double RelaxCoeff;             /*!< \brief Relaxation coefficient . */
   su2double FSI_Residual;           /*!< \brief FSI residual. */
+  
+  struct CustomLoad
+  {
+    unordered_map<int,int> glb2loc;
+    vector<int> globalIndices;
+    vector<su2double> loads;
+  };
+  CustomLoad customLoads;
 
 public:
   
