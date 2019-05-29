@@ -2173,11 +2173,13 @@ void CFEASolver::Compute_NodalStress(CGeometry *geometry, CSolver **solver_conta
       
       LinSysReact.AddBlock(indexNode[iNode], Res_Stress_i);
       
-      for (iStress = 0; iStress < nStress; iStress++) {
-        node[indexNode[iNode]]->AddStress_FEM(iStress, simp_penalty *
-                                              (element_container[FEA_TERM][EL_KIND]->Get_NodalStress(iNode, iStress) /
-                                               geometry->node[indexNode[iNode]]->GetnElem()) );
-      }
+//      for (iStress = 0; iStress < nStress; iStress++) {
+//        node[indexNode[iNode]]->AddStress_FEM(iStress, simp_penalty *
+//                                              (element_container[FEA_TERM][EL_KIND]->Get_NodalStress(iNode, iStress) /
+//                                               geometry->node[indexNode[iNode]]->GetnElem()) );
+//      }
+      node[indexNode[iNode]]->AddStress_FEM(0, element_properties[iElem]->GetDesignDensity() / geometry->node[indexNode[iNode]]->GetnElem());
+      node[indexNode[iNode]]->AddStress_FEM(1, element_properties[iElem]->GetPhysicalDensity() / geometry->node[indexNode[iNode]]->GetnElem());
       
     }
     
