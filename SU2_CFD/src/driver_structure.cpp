@@ -6266,6 +6266,7 @@ void CDiscAdjFSIDriver::StepGaussSeidel(unsigned short kind_of, const string &me
     Iterate_Block(ZONE_FLOW, ZONE_STRUCT, FEA_DISP_VARS);
 
   /*--- Iterate fluid (including cross term) ---*/
+  if(iOuterIter==1) return;
   Iterate_Block(ZONE_FLOW, ZONE_STRUCT, FLOW_CONS_VARS);
 
   /*--- Compute mesh (it is a cross term dF / dMv ) ---*/
