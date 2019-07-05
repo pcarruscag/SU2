@@ -4623,53 +4623,63 @@ void CFEASolver::Compute_OFRefGeom(CGeometry *geometry, CSolver **solver_contain
   weight_OF = config->GetRefGeom_Penalty() / nTotalPoint;
 
   if(!fsi)
-  for (iPoint = 0; iPoint < nPointDomain; iPoint++){
-      
-    // hack, reference geometry of only boundary points
-    su2double isVertex = node[iPoint]->Get_isVertex() ? 1.0 : 0.0;
-
-    for (iVar = 0; iVar < nVar; iVar++){
-
-      /*--- Retrieve the value of the reference geometry ---*/
-      reference_geometry = node[iPoint]->GetReference_Geometry(iVar);
-
-      /*--- Retrieve the value of the current solution ---*/
-      current_solution = node[iPoint]->GetSolution(iVar);
-
-      /*--- The objective function is the sum of the difference between solution and difference, squared ---*/
-      objective_function += isVertex * weight_OF * (current_solution - reference_geometry)*(current_solution - reference_geometry);
-    }
-
-  }
-  else {
-    for (iPoint = 0; iPoint < nPointDomain; iPoint++) {
-      
-      if (node[iPoint]->Get_isVertex()) {
-
-        su2double amplification = 0.0;
-      
-        for (iVar = 0; iVar < nVar; iVar++) {
-
-          /*--- Retrieve the value of the reference geometry ---*/
-          reference_geometry = node[iPoint]->GetReference_Geometry(iVar);
-
-          /*--- Retrieve the value of the current solution ---*/
-          if(config->GetOuterIter()!=0)
-          current_solution = node[iPoint]->GetSolution(iVar);
-          else
-          current_solution = SU2_TYPE::GetValue(node[iPoint]->GetSolution(iVar));
+  {
+    for (unsigned short iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++)
+    {
+      if ((config->GetMarker_All_KindBC(iMarker) == LOAD_BOUNDARY) ||
+          (config->GetMarker_All_KindBC(iMarker) == LOAD_DIR_BOUNDARY))
+      {
+        for (unsigned long iVertex = 0; iVertex < geometry->GetnVertex(iMarker); ++iVertex)
+        {
+          iPoint = geometry->vertex[iMarker][iVertex]->GetNode();
           
-          int glbIdx = geometry->node[iPoint]->GetGlobalIndex();
-          int locIdx = customLoads.glb2loc[glbIdx];
-          su2double reference_load = customLoads.loads[locIdx+iVar];
-          
-          su2double current_load = node[iPoint]->Get_FlowTraction(iVar);
-
-          amplification += (current_solution - reference_geometry)*(current_load - reference_load);
+          if (geometry->node[iPoint]->GetDomain())
+          {
+            for (iVar = 0; iVar < nVar; iVar++)
+            {
+              su2double delta = node[iPoint]->GetSolution(iVar) -
+                                node[iPoint]->GetReference_Geometry(iVar);
+              objective_function += weight_OF * delta*delta;
+            }
+          }
         }
-        
-//        objective_function += 0.001*log(1.0+exp(1000.0*amplification));
-        objective_function += 0.5*max(0.0,amplification)*amplification;
+      }
+    }
+  }
+  else
+  {
+    for (unsigned short iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++)
+    {
+      if ((config->GetMarker_All_KindBC(iMarker) == LOAD_BOUNDARY) ||
+          (config->GetMarker_All_KindBC(iMarker) == LOAD_DIR_BOUNDARY))
+      {
+        for (unsigned long iVertex = 0; iVertex < geometry->GetnVertex(iMarker); ++iVertex)
+        {
+          iPoint = geometry->vertex[iMarker][iVertex]->GetNode();
+          
+          if (geometry->node[iPoint]->GetDomain())
+          {
+            int glbIdx = geometry->node[iPoint]->GetGlobalIndex();
+            int locIdx = customLoads.glb2loc[glbIdx];
+            
+            su2double amplification = 0.0;
+            
+            for (iVar = 0; iVar < nVar; iVar++)
+            {
+              if(config->GetOuterIter()!=0)
+                current_solution = node[iPoint]->GetSolution(iVar);
+              else
+                current_solution = SU2_TYPE::GetValue(node[iPoint]->GetSolution(iVar));
+              
+              su2double delta_u = current_solution - node[iPoint]->GetReference_Geometry(iVar);
+              su2double delta_F = node[iPoint]->Get_FlowTraction(iVar) -
+                                  customLoads.loads[locIdx+iVar];
+              amplification += delta_u*delta_F;
+            }
+            
+            objective_function += config->GetRefGeom_Penalty() * 0.5*max(0.0,amplification)*amplification;
+          }
+        }
       }
     }
   }
