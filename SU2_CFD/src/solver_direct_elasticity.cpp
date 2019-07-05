@@ -3745,6 +3745,71 @@ void CFEASolver::ImplicitNewmark_Iteration(CGeometry *geometry, CSolver **solver
   
   bool incremental_load = config->GetIncrementalLoad();
   
+  
+  if (fsi && !config->GetDiscrete_Adjoint() && first_iter)
+  {
+    vector<unsigned long> globalIndices;
+    vector<su2double> interfaceValues;
+    
+    for (unsigned short iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++)
+    {
+      if ((config->GetMarker_All_KindBC(iMarker) == LOAD_BOUNDARY) ||
+          (config->GetMarker_All_KindBC(iMarker) == LOAD_DIR_BOUNDARY))
+      {
+        for (unsigned long iVertex = 0; iVertex < geometry->GetnVertex(iMarker); ++iVertex)
+        {
+          iPoint = geometry->vertex[iMarker][iVertex]->GetNode();
+          
+          if (geometry->node[iPoint]->GetDomain())
+          {
+            unsigned long glbIdx = geometry->node[iPoint]->GetGlobalIndex();
+            globalIndices.push_back(glbIdx);
+            
+            for (iVar = 0; iVar < nVar; iVar++)
+              interfaceValues.push_back(node[iPoint]->Get_FlowTraction(iVar));
+              
+            for (iVar = 0; iVar < nVar; iVar++)
+              interfaceValues.push_back(node[iPoint]->GetSolution(iVar));
+          }
+        }
+      }
+    }
+    
+    unsigned long locsize = globalIndices.size(), maxsize=1;
+    vector<unsigned long> allsizes(size,0);
+    
+    SU2_MPI::Reduce(&locsize,&maxsize,1,MPI_UNSIGNED_LONG,MPI_MAX,MASTER_NODE,MPI_COMM_WORLD);
+    SU2_MPI::Gather(&locsize,1,MPI_UNSIGNED_LONG,allsizes.data(),1,MPI_UNSIGNED_LONG,MASTER_NODE,MPI_COMM_WORLD);
+    
+    vector<unsigned long> recvbuf1(size*maxsize);
+    vector<su2double> recvbuf2(size*maxsize*2*nVar);
+    
+    SU2_MPI::Gather(globalIndices.data(), locsize, MPI_UNSIGNED_LONG,
+                    recvbuf1.data(),      maxsize, MPI_UNSIGNED_LONG,
+                    MASTER_NODE, MPI_COMM_WORLD);
+    SU2_MPI::Gather(interfaceValues.data(), locsize*2*nVar, MPI_DOUBLE,
+                    recvbuf2.data(),        maxsize*2*nVar, MPI_DOUBLE,
+                    MASTER_NODE, MPI_COMM_WORLD);
+    
+    if (rank == MASTER_NODE)
+    {
+      ofstream file;
+      file.open("loads_and_displacements.txt");
+      
+      for(int i=0; i<size; ++i) {
+        for(unsigned long j=0; j<allsizes[i]; ++j) {
+          file << recvbuf1[i*maxsize+j];
+          for(iVar=0; iVar<2*nVar; ++iVar) {
+            file << "  " << recvbuf2[i*maxsize*2*nVar + j*2*nVar + iVar];
+          }
+          file << endl;
+        }
+      }
+      file.close();
+    }
+  }
+  
+  
   if (!dynamic) {
 //      
 //    ofstream file;
@@ -4666,7 +4731,7 @@ void CFEASolver::Compute_OFRefGeom(CGeometry *geometry, CSolver **solver_contain
             
             for (iVar = 0; iVar < nVar; iVar++)
             {
-              if(config->GetOuterIter()!=0)
+              if (config->GetOuterIter()!=0)
                 current_solution = node[iPoint]->GetSolution(iVar);
               else
                 current_solution = SU2_TYPE::GetValue(node[iPoint]->GetSolution(iVar));
