@@ -3775,19 +3775,26 @@ void CFEASolver::ImplicitNewmark_Iteration(CGeometry *geometry, CSolver **solver
       }
     }
     
-    unsigned long locsize = globalIndices.size(), maxsize=1;
+    unsigned long locsize = globalIndices.size(), maxsize;
     vector<unsigned long> allsizes(size,0);
     
-    SU2_MPI::Reduce(&locsize,&maxsize,1,MPI_UNSIGNED_LONG,MPI_MAX,MASTER_NODE,MPI_COMM_WORLD);
+    SU2_MPI::Allreduce(&locsize,&maxsize,1,MPI_UNSIGNED_LONG,MPI_MAX,MPI_COMM_WORLD);
     SU2_MPI::Gather(&locsize,1,MPI_UNSIGNED_LONG,allsizes.data(),1,MPI_UNSIGNED_LONG,MASTER_NODE,MPI_COMM_WORLD);
     
-    vector<unsigned long> recvbuf1(size*maxsize);
-    vector<su2double> recvbuf2(size*maxsize*2*nVar);
+    globalIndices.resize(maxsize);
+    interfaceValues.resize(maxsize*2*nVar);
     
-    SU2_MPI::Gather(globalIndices.data(), locsize, MPI_UNSIGNED_LONG,
+    vector<unsigned long> recvbuf1(1); vector<su2double> recvbuf2(1);
+    
+    if (rank == MASTER_NODE) {
+      recvbuf1.resize(size*maxsize);
+      recvbuf2.resize(size*maxsize*2*nVar);
+    }
+    
+    SU2_MPI::Gather(globalIndices.data(), maxsize, MPI_UNSIGNED_LONG,
                     recvbuf1.data(),      maxsize, MPI_UNSIGNED_LONG,
                     MASTER_NODE, MPI_COMM_WORLD);
-    SU2_MPI::Gather(interfaceValues.data(), locsize*2*nVar, MPI_DOUBLE,
+    SU2_MPI::Gather(interfaceValues.data(), maxsize*2*nVar, MPI_DOUBLE,
                     recvbuf2.data(),        maxsize*2*nVar, MPI_DOUBLE,
                     MASTER_NODE, MPI_COMM_WORLD);
     
