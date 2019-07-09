@@ -4557,6 +4557,7 @@ void CEulerSolver::Centered_Residual(CGeometry *geometry, CSolver **solver_conta
   bool implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
   bool jst_scheme = ((config->GetKind_Centered_Flow() == JST)) ;//&& (iMesh == MESH_0));
   bool grid_movement = config->GetGrid_Movement();
+  bool rans = ((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS));
   
   for (iEdge = 0; iEdge < geometry->GetnEdge(); iEdge++) {
     
@@ -4590,6 +4591,7 @@ void CEulerSolver::Centered_Residual(CGeometry *geometry, CSolver **solver_conta
     /*--- Compute residuals, and Jacobians ---*/
     
     numerics->ComputeResidual(Res_Conv, Jacobian_i, Jacobian_j, config);
+    if (rans && (iMesh == MESH_0)) EdgeMassFluxes[iEdge] = Res_Conv[0];
     
     /*--- Update convective and artificial dissipation residuals ---*/
     
@@ -4631,6 +4633,7 @@ void CEulerSolver::Upwind_Residual(CGeometry *geometry, CSolver **solver_contain
   bool van_albada       = config->GetKind_SlopeLimit_Flow() == VAN_ALBADA_EDGE;
   bool low_mach_corr    = config->Low_Mach_Correction();
   unsigned short kind_dissipation = config->GetKind_RoeLowDiss();
+  bool rans = ((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS));
     
   /*--- Loop over all the edges ---*/
 
@@ -4815,6 +4818,7 @@ void CEulerSolver::Upwind_Residual(CGeometry *geometry, CSolver **solver_contain
     /*--- Compute the residual ---*/
     
     numerics->ComputeResidual(Res_Conv, Jacobian_i, Jacobian_j, config);
+    if (rans && (iMesh == MESH_0)) EdgeMassFluxes[iEdge] = Res_Conv[0];
 
     /*--- Update residual value ---*/
     
@@ -15089,6 +15093,9 @@ CNSSolver::CNSSolver(void) : CEulerSolver() {
   SlidingStateNodes = NULL;
   
   HeatConjugateVar = NULL;
+  
+  /*--- Edge mass fluxes ---*/
+  EdgeMassFluxes = NULL;
 
 }
 
@@ -15846,6 +15853,15 @@ CNSSolver::CNSSolver(CGeometry *geometry, CConfig *config, unsigned short iMesh)
 
   Set_MPI_Solution(geometry, config);
   
+  /*--- Allocate and initialize edge mass flux array if RANS and for the finest grid only ---*/
+  
+  if (rans && (iMesh == MESH_0)) {
+    
+    EdgeMassFluxes = new su2double [geometry->GetnEdge()];
+    
+    for(unsigned long iEdge = 0; iEdge < geometry->GetnEdge(); ++iEdge)
+      EdgeMassFluxes[iEdge] = 0.0;
+  }
 }
 
 CNSSolver::~CNSSolver(void) {
@@ -15917,6 +15933,7 @@ CNSSolver::~CNSSolver(void) {
     delete [] Buffet_Sensor;
   }
   
+  if (EdgeMassFluxes != NULL) delete [] EdgeMassFluxes;
 }
 
 void CNSSolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, CConfig *config, unsigned short iMesh, unsigned short iRKStep, unsigned short RunTime_EqSystem, bool Output) {

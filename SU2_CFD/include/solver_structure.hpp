@@ -127,6 +127,8 @@ protected:
   su2double **Smatrix,  /*!< \brief Auxiliary structure for computing gradients by least-squares */
   **Cvector;       /*!< \brief Auxiliary structure for computing gradients by least-squares */
 
+  su2double *EdgeMassFluxes;  /*!< \brief Mass fluxes across each edge, for discretization of passive scalars. */
+  
   int *Restart_Vars;       /*!< \brief Auxiliary structure for holding the number of variables and points in a restart. */
   int Restart_ExtIter;     /*!< \brief Auxiliary structure for holding the external iteration offset from a restart. */
   passivedouble *Restart_Data; /*!< \brief Auxiliary structure for holding the data values from a restart. */
@@ -4388,6 +4390,13 @@ public:
    * \param[in] values - The interface values.
    */
   void SetInterfaceValues(CGeometry *geometry, CConfig *config, vector<passivedouble> &values);
+
+  /*!
+   * \brief Get the mass flux across an edge (computed and stored during the discretization of convective fluxes).
+   * \param[in] iEdge - Index of the edge.
+   * \return The mass flux across the edge.
+   */
+  inline su2double GetEdgeMassFlux(const unsigned long iEdge) const {return EdgeMassFluxes[iEdge];}
 
 };
 
