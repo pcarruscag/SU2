@@ -145,7 +145,8 @@ public:
   CSysVector LinSysSol;    /*!< \brief vector to store iterative solution of implicit linear system. */
   CSysVector LinSysRes;    /*!< \brief vector to store iterative residual of implicit linear system. */
   CSysVector LinSysAux;    /*!< \brief vector to store iterative residual of implicit linear system. */
-  CSysMatrix Jacobian; /*!< \brief Complete sparse Jacobian structure for implicit computations. */
+  CSysMatrix Jacobian;     /*!< \brief Complete sparse Jacobian structure for implicit computations. */
+  CSysSolve  System;       /*!< \brief Linear solver/smoother. */
   
   CSysMatrix StiffMatrix; /*!< \brief Sparse structure for storing the stiffness matrix in Galerkin computations, and grid movement. */
   
@@ -11712,7 +11713,6 @@ private:
   
   su2double **Jacobian_c_ij;      /*!< \brief Submatrix to store the constitutive term for node ij. */
   su2double **Jacobian_s_ij;      /*!< \brief Submatrix to store the stress contribution of node ij (diagonal). */
-  su2double **Jacobian_k_ij;      /*!< \brief Submatrix to store the pressure contribution of node ij. */
   su2double **MassMatrix_ij;      /*!< \brief Submatrix to store the term ij of the mass matrix. */
   su2double *Res_Stress_i;      /*!< \brief Submatrix to store the nodal stress contribution of node i. */
   
