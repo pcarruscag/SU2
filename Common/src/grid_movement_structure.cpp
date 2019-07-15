@@ -303,6 +303,12 @@ void CVolumetricMovement::SetVolume_Deformation(CGeometry *geometry, CConfig *co
           Tot_Iter = System.CG_LinSolver(LinSysRes, LinSysSol, *mat_vec, *precond, NumError, Smoothing_Iter, &Residual, Screen_Output);
 
           break;
+        
+        default:
+          
+          StiffMatrix.BuildPastixPreconditioner(geometry, config, config->GetKind_Deform_Linear_Solver(), false);
+          StiffMatrix.ComputePastixPreconditioner(LinSysRes, LinSysSol, geometry, config);
+          break;
 
       }
     }
