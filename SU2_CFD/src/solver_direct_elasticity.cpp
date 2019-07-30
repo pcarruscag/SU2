@@ -989,7 +989,7 @@ void CFEASolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, 
    * so we ask "geometry" to compute them.
    * This only needs to be done for the undeformed (initial) shape.
    */
-  if (topology_mode && (restart || initial_calc || initial_calc_restart || disc_adj_fem)) {
+  if (topology_mode && ((first_iter && initial_calc_restart) || disc_adj_fem)) {
     geometry->SetElemVolume(config);
     FilterElementDensities(geometry,config);
   }
@@ -4223,14 +4223,16 @@ void CFEASolver::Compute_OFVolFrac(CGeometry *geometry, CSolver **solver_contain
   /*--- Perform a volume average of the physical density of the elements for topology optimization ---*/
 
   unsigned long iElem, nElem = geometry->GetnElem();
-  su2double total_volume = 0.0, integral = 0.0;
+  su2double total_volume = 0.0, integral = 0.0, discreteness = 0.0;
 
   for (iElem=0; iElem<nElem; ++iElem) {
     /*--- count only elements that belong to the partition ---*/
     if ( geometry->node[geometry->elem[iElem]->GetNode(0)]->GetDomain() ){
       su2double volume = geometry->elem[iElem]->GetVolume();
+      su2double rho = element_properties[iElem]->GetPhysicalDensity();
       total_volume += volume;
-      integral += volume*element_properties[iElem]->GetPhysicalDensity();
+      integral += volume*rho;
+      discreteness += volume*4.0*rho*(1.0-rho);
     }
   }
   
@@ -4241,19 +4243,91 @@ void CFEASolver::Compute_OFVolFrac(CGeometry *geometry, CSolver **solver_contain
     total_volume = tmp;
     SU2_MPI::Allreduce(&integral,&tmp,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
     integral = tmp;
+    SU2_MPI::Allreduce(&discreteness,&tmp,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    discreteness = tmp;
   }
 #endif
 
-  Total_OFVolFrac = integral/total_volume;
+  if (config->GetKind_ObjFunc() == TOPOL_DISCRETENESS)
+    Total_OFVolFrac = discreteness/total_volume;
+  else
+    Total_OFVolFrac = integral/total_volume;
 
   // TODO: Temporary output file for the objective function. Will be integrated in the output once is refurbished.
   if (rank == MASTER_NODE){
     cout << "Objective function: " << Total_OFVolFrac << "." << endl;
+
     ofstream myfile_res;
-    myfile_res.open ("of_volfrac.dat");
+    if (config->GetKind_ObjFunc() == TOPOL_DISCRETENESS)
+      myfile_res.open ("of_topdisc.dat");
+    else
+      myfile_res.open ("of_volfrac.dat");
+
     myfile_res.precision(15);
     myfile_res << scientific << Total_OFVolFrac << endl;
     myfile_res.close();
+  }
+}
+
+void CFEASolver::Compute_OFCompliance(CGeometry *geometry, CSolver **solver_container, CConfig *config)
+{
+  unsigned long iPoint;
+  unsigned short iVar;
+  su2double nodalForce[3];
+
+  /*--- Types of loads to consider ---*/
+  bool fsi = config->GetFSI_Simulation();
+  bool body_forces = config->GetDeadLoad();
+
+  /*--- If the loads are being applied incrementaly ---*/
+  bool incremental_load = config->GetIncrementalLoad();
+
+  /*--- Computation (compliance = sum(f dot u) ) ---*/
+  /*--- Cannot be computed as u^T K u as the problem may not be linear ---*/
+
+  Total_OFCompliance = 0.0;
+
+  for (iPoint = 0; iPoint < nPointDomain; iPoint++) {
+
+    /*--- Initialize with loads speficied through config ---*/
+    for (iVar = 0; iVar < nVar; iVar++)
+      nodalForce[iVar] = node[iPoint]->Get_SurfaceLoad_Res(iVar);
+
+    /*--- Add contributions due to body forces ---*/
+    if (body_forces)
+      for (iVar = 0; iVar < nVar; iVar++)
+        nodalForce[iVar] += node[iPoint]->Get_BodyForces_Res(iVar);
+
+    /*--- Add contributions due to fluid loads---*/
+    if (fsi)
+      for (iVar = 0; iVar < nVar; iVar++)
+        nodalForce[iVar] += node[iPoint]->Get_FlowTraction(iVar);
+
+    /*--- Correct for incremental loading ---*/
+    if (incremental_load)
+      for (iVar = 0; iVar < nVar; iVar++)
+        nodalForce[iVar] *= loadIncrement;
+
+    /*--- Add work contribution from this node ---*/
+    for (iVar = 0; iVar < nVar; iVar++)
+      Total_OFCompliance += nodalForce[iVar]*node[iPoint]->GetSolution(iVar);
+  }
+
+#ifdef HAVE_MPI
+  su2double tmp;
+  SU2_MPI::Allreduce(&Total_OFCompliance,&tmp,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+  Total_OFCompliance = tmp;
+#endif
+
+  // TODO: Temporary output file for the objective function. Will be integrated in the output once refurbished.
+  if (rank == MASTER_NODE) {
+    cout << "Objective function: " << Total_OFCompliance << "." << endl;
+
+    ofstream file;
+    file.open("of_topcomp.dat");
+    file.precision(15);
+    file << scientific << Total_OFCompliance << endl;
+    file.close();
   }
 }
 
