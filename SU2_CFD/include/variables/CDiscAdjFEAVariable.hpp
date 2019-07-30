@@ -300,4 +300,21 @@ public:
    */
   inline su2double Get_BGSSolution_k(unsigned short iDim) {return Solution_BGS_k[iDim];}
 
+  /*!
+   * \brief Redefined as for the DiscAdjFEA solver "interface values" is the geometry cross term.
+   * \param[in,out] vec - target vector.
+   */
+  inline void GetInterfaceValues(vector<passivedouble> &vec) {
+    for (unsigned short iVar=0; iVar < nVar; ++iVar)
+      vec.push_back(SU2_TYPE::GetValue(Geometry_CrossTerm_Derivative[iVar]));
+  }
+
+  /*!
+   * \brief Redefined as for the DiscAdjFEA solver "interface values" is the geometry cross term.
+   * \param[in,out] it - iterator to source vector.
+   */
+  void SetInterfaceValues(vector<passivedouble>::const_iterator &it) {
+    for (unsigned short iVar=0; iVar < nVar; ++iVar) {Geometry_CrossTerm_Derivative[iVar] = *it; ++it;}
+  }
+
 };

@@ -338,7 +338,7 @@ public:
                                         unsigned short val_iZone,
                                         unsigned short val_iInst,
                                         int val_DirectIter){}
-
+                                        
   virtual void SetRecording(CSolver *****solver_container,
                             CGeometry ****geometry_container,
                             CConfig **config_container,
@@ -346,6 +346,36 @@ public:
                             unsigned short val_iInst,
                             unsigned short kind_recording) { }
 
+  /*!
+   * \brief A virtual member.
+   * \param[in] geometry_container - Geometrical definition of all the problems.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config_container - Definitions of the problems.
+   * \param[in] val_iZone - Zone index.
+   * \param[in] val_iInst - Instance index.
+   * \param[out] values - The interface values.
+   */
+  virtual void GetInterfaceValues(CGeometry ****geometry_container,
+                                  CSolver *****solver_container,
+                                  CConfig **config_container,
+                                  unsigned short val_iZone,
+                                  unsigned short val_iInst,
+                                  vector<passivedouble> &values) {}
+  /*!
+   * \brief A virtual member.
+   * \param[in] geometry_container - Geometrical definition of all the problems.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config_container - Definition of the particular problem.
+   * \param[in] val_iZone - Zone index.
+   * \param[in] val_iInst - Instance index.
+   * \param[in] values - The interface values.
+   */
+  virtual void SetInterfaceValues(CGeometry ****geometry_container,
+                                  CSolver *****solver_container,
+                                  CConfig **config_container,
+                                  unsigned short val_iZone,
+                                  unsigned short val_iInst,
+                                  vector<passivedouble> &values) {}
 };
 
 
@@ -992,7 +1022,37 @@ public:
                    unsigned short val_iZone,
                    unsigned short val_iInst);
 
+  /*!
+   * \brief Get (gather onto master node) displacements at interface nodes, for use in multi-physics coupling methods.
+   * \param[in] geometry_container - Geometrical definition of all the problems.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config_container - Definitions of the problems.
+   * \param[in] val_iZone - Zone index.
+   * \param[in] val_iInst - Instance index.
+   * \param[out] values - The interface values.
+   */
+  void GetInterfaceValues(CGeometry ****geometry_container,
+                          CSolver *****solver_container,
+                          CConfig **config_container,
+                          unsigned short val_iZone,
+                          unsigned short val_iInst,
+                          vector<passivedouble> &values);
 
+  /*!
+   * \brief Set (scatter from master node) displacements at interface nodes, for use in multi-physics coupling methods.
+   * \param[in] geometry_container - Geometrical definition of all the problems.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config_container - Definitions of the problems.
+   * \param[in] val_iZone - Zone index.
+   * \param[in] val_iInst - Instance index.
+   * \param[in] values - The interface values.
+   */
+  void SetInterfaceValues(CGeometry ****geometry_container,
+                          CSolver *****solver_container,
+                          CConfig **config_container,
+                          unsigned short val_iZone,
+                          unsigned short val_iInst,
+                          vector<passivedouble> &values);
 };
 
 /*!
@@ -1678,6 +1738,37 @@ public:
                       unsigned short val_iInst,
                       int val_DirectIter);
 
+  /*!
+   * \brief Get (gather onto master node) adjoint displacements at interface nodes, for use in multi-physics coupling methods.
+   * \param[in] geometry_container - Geometrical definition of all the problems.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config_container - Definitions of the problems.
+   * \param[in] val_iZone - Zone index.
+   * \param[in] val_iInst - Instance index.
+   * \param[out] values - The interface values.
+   */
+  void GetInterfaceValues(CGeometry ****geometry_container,
+                          CSolver *****solver_container,
+                          CConfig **config_container,
+                          unsigned short val_iZone,
+                          unsigned short val_iInst,
+                          vector<passivedouble> &values);
+
+  /*!
+   * \brief Set (scatter from master node) adjoint displacements at interface nodes, for use in multi-physics coupling methods.
+   * \param[in] geometry_container - Geometrical definition of all the problems.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config_container - Definitions of the problems.
+   * \param[in] val_iZone - Zone index.
+   * \param[in] val_iInst - Instance index.
+   * \param[in] values - The interface values.
+   */
+  void SetInterfaceValues(CGeometry ****geometry_container,
+                          CSolver *****solver_container,
+                          CConfig **config_container,
+                          unsigned short val_iZone,
+                          unsigned short val_iInst,
+                          vector<passivedouble> &values);
 };
 
 /*!

@@ -4291,6 +4291,22 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   virtual void SetDES_LengthScale(CSolver** solver, CGeometry *geometry, CConfig *config);
+  
+  /*!
+   * \brief Get (gather onto master node) variable values at interface nodes, for use in multi-physics coupling methods. 
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   * \param[out] values - The interface values.
+   */
+  void GetInterfaceValues(CGeometry *geometry, CConfig *config, vector<passivedouble> &values);
+
+  /*!
+   * \brief Set (scatter from master node) variable values at interface nodes, for use in multi-physics coupling methods. 
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   * \param[in] values - The interface values.
+   */
+  void SetInterfaceValues(CGeometry *geometry, CConfig *config, vector<passivedouble> &values);
 
   /*!
    * \brief Routine that sets the flag controlling implicit treatment for periodic BCs.
@@ -12597,6 +12613,7 @@ public:
    * \param[in] val_iterlinsolver - Number of linear iterations.
    */
   void UpdateSolution_BGS(CGeometry *geometry, CConfig *config);
+
 };
 
 /*!
@@ -12948,7 +12965,6 @@ public:
    * \param[in] val_update_geo - Flag for updating coords and grid velocity.
    */
   void LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *config, int val_iter, bool val_update_geo);
-
 };
 
 /*!

@@ -2512,4 +2512,20 @@ public:
 
   inline virtual su2double GetSolution_Old_Accel(unsigned short iVar) {return 0.0; }
 
+  /*!
+   * \brief Get (append to vec) the Solution at the node, for use in multi-physics coupling methods.
+   * \param[in,out] vec - on entry values collected so far, on exit values appended for "this" node.
+   */
+  inline virtual void GetInterfaceValues(vector<passivedouble> &vec) {
+    for(unsigned short iVar = 0; iVar < nVar; ++iVar) vec.push_back(SU2_TYPE::GetValue(Solution[iVar]));
+  }
+
+  /*!
+   * \brief Set the Solution at the node, for use in multi-physics coupling methods.
+   * \param[in,out] it - iterator for source values, on exit is incremented, no change to underlying values.
+   */
+  inline virtual void SetInterfaceValues(vector<passivedouble>::const_iterator &it) {
+    for(unsigned short iVar = 0; iVar < nVar; ++iVar) {Solution[iVar] = *it; ++it;}
+  }
+
 };

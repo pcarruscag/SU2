@@ -1872,6 +1872,30 @@ void CFEAIteration::Solve(COutput *output,
 
 }
 
+void CFEAIteration::GetInterfaceValues(CGeometry ****geometry_container,
+                                       CSolver *****solver_container,
+                                       CConfig **config_container,
+                                       unsigned short val_iZone,
+                                       unsigned short val_iInst,
+                                       vector<passivedouble> &values) {
+
+  /*--- The structural iteration only controls one solver, so this a direct call to that solver.  ---*/
+  solver_container[val_iZone][INST_0][MESH_0][FEA_SOL]->GetInterfaceValues(geometry_container[val_iZone][INST_0][MESH_0],
+                                                                           config_container[val_iZone], values);
+}
+
+void CFEAIteration::SetInterfaceValues(CGeometry ****geometry_container,
+                                       CSolver *****solver_container,
+                                       CConfig **config_container,
+                                       unsigned short val_iZone,
+                                       unsigned short val_iInst,
+                                       vector<passivedouble> &values) {
+
+  /*--- The structural iteration only controls one solver, so this a direct call to that solver.  ---*/
+  solver_container[val_iZone][INST_0][MESH_0][FEA_SOL]->SetInterfaceValues(geometry_container[val_iZone][INST_0][MESH_0],
+                                                                           config_container[val_iZone], values);
+}
+
 CAdjFluidIteration::CAdjFluidIteration(CConfig *config) : CIteration(config) { }
 CAdjFluidIteration::~CAdjFluidIteration(void) { }
 void CAdjFluidIteration::Preprocess(COutput *output,
@@ -3301,6 +3325,31 @@ void CDiscAdjFEAIteration::Postprocess(COutput *output,
     break;
   }
 }
+
+void CDiscAdjFEAIteration::GetInterfaceValues(CGeometry ****geometry_container,
+                                       CSolver *****solver_container,
+                                       CConfig **config_container,
+                                       unsigned short val_iZone,
+                                       unsigned short val_iInst,
+                                       vector<passivedouble> &values) {
+
+  /*--- The structural adjoint iteration only controls one adjoint solver, so this a direct call to that solver.  ---*/
+  solver_container[val_iZone][INST_0][MESH_0][ADJFEA_SOL]->GetInterfaceValues(geometry_container[val_iZone][INST_0][MESH_0],
+                                                                              config_container[val_iZone], values);
+}
+
+void CDiscAdjFEAIteration::SetInterfaceValues(CGeometry ****geometry_container,
+                                       CSolver *****solver_container,
+                                       CConfig **config_container,
+                                       unsigned short val_iZone,
+                                       unsigned short val_iInst,
+                                       vector<passivedouble> &values) {
+
+  /*--- The structural adjoint iteration only controls one adjoint solver, so this a direct call to that solver.  ---*/
+  solver_container[val_iZone][INST_0][MESH_0][ADJFEA_SOL]->SetInterfaceValues(geometry_container[val_iZone][INST_0][MESH_0],
+                                                                              config_container[val_iZone], values);
+}
+
 
 CDiscAdjHeatIteration::CDiscAdjHeatIteration(CConfig *config) : CIteration(config) { }
 
