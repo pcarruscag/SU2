@@ -36,6 +36,7 @@
  */
 
 #include "../include/solver_structure.hpp"
+#include "../include/variables/CDiscAdjFEAVariable.hpp"
 
 CDiscAdjFEASolver::CDiscAdjFEASolver(void) : CSolver (){
 
@@ -1361,4 +1362,3 @@ void CDiscAdjFEASolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CCo
   Restart_Vars = NULL; Restart_Data = NULL;
 
 }
-
