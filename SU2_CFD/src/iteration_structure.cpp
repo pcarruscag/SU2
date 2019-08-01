@@ -3115,8 +3115,8 @@ void CDiscAdjFEAIteration::SetDependencies(CSolver *****solver_container, CGeome
   geometry_container[iZone][iInst][MESH_0]->InitiateComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], COORDINATES);
   geometry_container[iZone][iInst][MESH_0]->CompleteComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], COORDINATES);
 
-  solver_container[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], SOLUTION);
-  solver_container[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], SOLUTION);
+  solver_container[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], SOLUTION_FEA);
+  solver_container[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], SOLUTION_FEA);
 
 }
 
