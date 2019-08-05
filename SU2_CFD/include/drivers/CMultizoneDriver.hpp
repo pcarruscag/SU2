@@ -57,7 +57,8 @@ protected:
   unsigned short *nVarZone;
   su2double **init_res,      /*!< \brief Stores the initial residual. */
             **residual,      /*!< \brief Stores the current residual. */
-            **residual_rel;  /*!< \brief Stores the residual relative to the initial. */
+            **residual_rel,  /*!< \brief Stores the residual relative to the initial. */
+            interface_res;   /*!< \brief Interface residual for interface solution methods. */
 
   su2double flow_criteria,
             flow_criteria_rel,
@@ -104,9 +105,19 @@ public:
   void Run_GaussSeidel();
 
   /*!
+   * \brief Run a single Block Gauss-Seidel step.
+   */
+  void StepGaussSeidel(unsigned long iOuter_Iter);
+
+  /*!
    * \brief Run a Block-Jacobi iteration in all physical zones.
    */
   void Run_Jacobi();
+
+  /*!
+   * \brief Run a IQN-ILS (see e.g. https://doi.org/10.1007/s11831-013-9085-5) iteration.
+   */
+  void Run_InterfaceQuasiNewtonInvLeastSquares();
 
   /*!
    * \brief Update the dual-time solution within multiple zones.

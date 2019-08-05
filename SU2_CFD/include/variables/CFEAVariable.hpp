@@ -530,4 +530,12 @@ public:
    */
   inline su2double Get_BGSSolution_k(unsigned short iDim) {return Solution_BGS_k[iDim];}
 
+  /*!
+   * \brief Redefined as for the FEA solver the transferred "interface values" is the predicted solution.
+   * \param[in,out] it - iterator to source vector.
+   */
+  inline void SetInterfaceValues(vector<passivedouble>::const_iterator &it) {
+    for(unsigned short iVar = 0; iVar < nVar; ++iVar) {Solution_Pred[iVar] = *it; ++it;}
+  }
+
 };
