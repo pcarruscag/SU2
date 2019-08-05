@@ -4389,6 +4389,7 @@ void CFEASolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *c
   bool dynamic = (config->GetDynamic_Analysis() == DYNAMIC);
   bool fluid_structure = config->GetFSI_Simulation();
   bool discrete_adjoint = config->GetDiscrete_Adjoint();
+  bool consist_restart = config->GetConsistentRestart();
 
   if (dynamic) nSolVar = 3 * nVar;
   else nSolVar = nVar;
@@ -4455,7 +4456,8 @@ void CFEASolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *c
         }
         if (fluid_structure && !dynamic) {
           node[iPoint_Local]->SetSolution_Pred(iVar, Sol[iVar]);
-          node[iPoint_Local]->SetSolution_Pred_Old(iVar, Sol[iVar]);
+          if(discrete_adjoint || consist_restart)
+            node[iPoint_Local]->SetSolution_Pred_Old(iVar, Sol[iVar]);
         }
         if (fluid_structure && discrete_adjoint){
           node[iPoint_Local]->SetSolution_Old(iVar, Sol[iVar]);

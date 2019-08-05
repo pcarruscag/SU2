@@ -169,8 +169,10 @@ CDriver::CDriver(char* confFile,
     Interface_Preprocessing(config_container, solver_container, geometry_container,
                             transfer_types, transfer_container, interpolator_container);
   }
-  
-  if(fsi && (config_container[ZONE_0]->GetRestart() || config_container[ZONE_0]->GetDiscrete_Adjoint())){
+
+  if((fsi && config_container[ZONE_0]->GetDiscrete_Adjoint()) ||
+     (fsi && config_container[ZONE_0]->GetRestart() && config_container[ZONE_0]->GetConsistentRestart())) {
+
     if (rank == MASTER_NODE)cout << endl <<"Restarting Fluid and Structural Solvers." << endl;
 
     for (iZone = 0; iZone < nZone; iZone++) {

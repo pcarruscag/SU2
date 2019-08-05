@@ -942,6 +942,7 @@ private:
   bool DeadLoad; 	          	/*!< Application of dead loads to the FE analysis */
   bool PseudoStatic;    /*!< Application of dead loads to the FE analysis */
   bool SteadyRestart; 	      /*!< Restart from a steady state for FSI problems. */
+  bool ConsistentRestart;     /*!< \brief If false the fluid grid coordinates are not loaded from the restart file. */
   su2double Newmark_beta,		/*!< \brief Parameter alpha for Newmark method. */
   Newmark_gamma;				      /*!< \brief Parameter delta for Newmark method. */
   unsigned short nIntCoeffs;	/*!< \brief Number of integration coeffs for structural calculations. */
@@ -8528,6 +8529,10 @@ public:
   
   bool GetSteadyRestart(void);
   
+  /*!
+   * \brief Identifies if (true) the restart file was computed for the current mesh.
+   */
+  bool GetConsistentRestart(void) const;
   
   /*!
    * \brief Provides information about the time integration of the structural analysis, and change the write in the output
