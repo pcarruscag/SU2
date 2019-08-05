@@ -3104,11 +3104,11 @@ void CDiscAdjFEAIteration::SetDependencies(CSolver *****solver, CGeometry ****ge
 
   /*--- Add dependencies for grid coordinate derivatives, no need for full update as the structural solver only uses the node coordinates. ---*/
 
-  geometry_container[iZone][iInst][MESH_0]->InitiateComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], COORDINATES);
-  geometry_container[iZone][iInst][MESH_0]->CompleteComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], COORDINATES);
+  geometry[iZone][iInst][MESH_0]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], COORDINATES);
+  geometry[iZone][iInst][MESH_0]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], COORDINATES);
 
-  solver_container[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], SOLUTION);
-  solver_container[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry_container[iZone][iInst][MESH_0], config_container[iZone], SOLUTION);
+  solver[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION);
+  solver[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION);
 
 }
 
