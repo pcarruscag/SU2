@@ -3135,8 +3135,8 @@ void CDiscAdjFEAIteration::SetDependencies(CSolver *****solver, CGeometry ****ge
   geometry[iZone][iInst][MESH_0]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], COORDINATES);
   geometry[iZone][iInst][MESH_0]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], COORDINATES);
 
-  solver[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION);
-  solver[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION);
+  solver[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION_FEA);
+  solver[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION_FEA);
 
 }
 
