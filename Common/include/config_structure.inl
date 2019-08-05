@@ -2060,3 +2060,9 @@ inline unsigned short CConfig::GetEig_Val_Comp(void) {return eig_val_comp; }
 inline su2double CConfig::GetUQ_URLX(void) {return uq_urlx; }
 
 inline bool CConfig::GetUQ_Permute(void) { return uq_permute; }
+
+inline unsigned long CConfig::GetPastixFactFreq(void) { return pastix_fact_freq; }
+
+inline unsigned short CConfig::GetPastixVerbLvl(void) { return pastix_verb_lvl; }
+
+inline unsigned short CConfig::GetPastixFillLvl(void) { return pastix_fill_lvl; }
