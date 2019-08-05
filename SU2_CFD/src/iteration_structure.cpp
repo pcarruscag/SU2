@@ -3106,6 +3106,14 @@ void CDiscAdjFEAIteration::SetDependencies(CSolver *****solver, CGeometry ****ge
 
   }
 
+  /*--- Add dependencies for grid coordinate derivatives, no need for full update as the structural solver only uses the node coordinates. ---*/
+
+  geometry[iZone][iInst][MESH_0]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], COORDINATES);
+  geometry[iZone][iInst][MESH_0]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], COORDINATES);
+
+  solver[iZone][iInst][MESH_0][FEA_SOL]->InitiateComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION);
+  solver[iZone][iInst][MESH_0][FEA_SOL]->CompleteComms(geometry[iZone][iInst][MESH_0], config[iZone], SOLUTION);
+
 }
 
 void CDiscAdjFEAIteration::RegisterOutput(CSolver *****solver, CGeometry ****geometry, CConfig **config, unsigned short iZone, unsigned short iInst){
