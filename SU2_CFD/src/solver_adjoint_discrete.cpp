@@ -487,7 +487,7 @@ void CDiscAdjSolver::ExtractAdjoint_Solution(CGeometry *geometry, CConfig *confi
 
   /*--- Set the old solution ---*/
 
-  if(!config->GetMultizone_Problem() || config->GetFSI_Simulation())
+//  if(!config->GetMultizone_Problem() || config->GetFSI_Simulation())
     nodes->Set_OldSolution();
   
   for (iPoint = 0; iPoint < nPoint; iPoint++) {
@@ -754,19 +754,20 @@ void CDiscAdjSolver::SetAdjoint_Output(CGeometry *geometry, CConfig *config) {
 
   bool dual_time = (config->GetTime_Marching() == DT_STEPPING_1ST ||
       config->GetTime_Marching() == DT_STEPPING_2ND);
-  bool fsi = config->GetFSI_Simulation();
+  bool fsi = false;//config->GetFSI_Simulation();
 
   unsigned short iVar;
   unsigned long iPoint;
 
   for (iPoint = 0; iPoint < nPoint; iPoint++) {
     for (iVar = 0; iVar < nVar; iVar++) {
-      if(config->GetMultizone_Problem() && !fsi) {
-        Solution[iVar] = nodes->Get_BGSSolution_k(iPoint,iVar);
-      }
-      else {
+// PG: If BGSSolution_k is used here inner adjoint iterations do not advance 
+//      if(config->GetMultizone_Problem() && !fsi) {
+//        Solution[iVar] = nodes->Get_BGSSolution_k(iPoint,iVar);
+//      }
+//      else {
         Solution[iVar] = nodes->GetSolution(iPoint,iVar);
-      }
+//      }
     }
     if (fsi) {
       for (iVar = 0; iVar < nVar; iVar++) {
@@ -1130,7 +1131,7 @@ void CDiscAdjSolver::UpdateSolution_BGS(CGeometry *geometry, CConfig *config){
   /*--- As there might be crossed dependencies, we need to use the full BGS solution and not just the node Solution ---*/
   for (iPoint = 0; iPoint < nPoint; iPoint++){
     for (iVar = 0; iVar < nVar; iVar++)
-        nodes->Set_BGSSolution_k(iPoint, iVar, nodes->Get_BGSSolution(iPoint, iVar));
+      nodes->Set_BGSSolution_k(iPoint, iVar, nodes->Get_BGSSolution(iPoint, iVar));
   }
 
 }

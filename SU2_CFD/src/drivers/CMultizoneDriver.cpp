@@ -539,6 +539,7 @@ void CMultizoneDriver::DynamicMeshUpdate(unsigned short val_iZone, unsigned long
 
   /*--- Legacy dynamic mesh update - Only if GRID_MOVEMENT = YES ---*/
   if (config_container[ZONE_0]->GetGrid_Movement() || config_container[ZONE_0]->GetSurface_Movement(FLUID_STRUCTURE_STATIC)) {
+  cout << "legacy deformation" << endl;
   iteration_container[val_iZone][INST_0]->SetGrid_Movement(geometry_container[val_iZone][INST_0],surface_movement[val_iZone], 
                                                            grid_movement[val_iZone][INST_0], solver_container[val_iZone][INST_0],
                                                            config_container[val_iZone], 0, TimeIter);
@@ -622,6 +623,15 @@ bool CMultizoneDriver::Transfer_Data(unsigned short donorZone, unsigned short ta
   else if (interface_types[donorZone][targetZone] == BOUNDARY_DISPLACEMENTS) {
     interface_container[donorZone][targetZone]->BroadcastData(solver_container[donorZone][INST_0][MESH_0][FEA_SOL],
                                                               solver_container[targetZone][INST_0][MESH_0][MESH_SOL],
+                                                              geometry_container[donorZone][INST_0][MESH_0],
+                                                              geometry_container[targetZone][INST_0][MESH_0],
+                                                              config_container[donorZone],
+                                                              config_container[targetZone]);
+    UpdateMesh = true;
+  }
+  else if (interface_types[donorZone][targetZone] == STRUCTURAL_DISPLACEMENTS_DISC_ADJ) {
+    interface_container[donorZone][targetZone]->BroadcastData(solver_container[donorZone][INST_0][MESH_0][FEA_SOL],
+                                                              solver_container[targetZone][INST_0][MESH_0][FLOW_SOL],
                                                               geometry_container[donorZone][INST_0][MESH_0],
                                                               geometry_container[targetZone][INST_0][MESH_0],
                                                               config_container[donorZone],

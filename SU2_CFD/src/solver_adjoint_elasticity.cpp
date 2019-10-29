@@ -438,7 +438,14 @@ void CDiscAdjFEASolver::RegisterSolution(CGeometry *geometry, CConfig *config){
 
   /*--- Register solution at all necessary time instances and other variables on the tape ---*/
 
-  direct_solver->GetNodes()->RegisterSolution(input);
+  if(config->GetMultizone_Problem()) {
+    direct_solver->GetNodes()->RegisterSolution_intIndexBased(input);
+    direct_solver->GetNodes()->SetAdjIndices(input);
+  } else {
+    direct_solver->GetNodes()->RegisterSolution(input);
+  }
+  
+//  direct_solver->GetNodes()->RegisterSolution(input);
 
   if (dynamic) {
 
@@ -522,7 +529,14 @@ void CDiscAdjFEASolver::RegisterOutput(CGeometry *geometry, CConfig *config){
 
   bool input = false;
 
-  direct_solver->GetNodes()->RegisterSolution(input);
+  if(config->GetMultizone_Problem()) {
+    direct_solver->GetNodes()->RegisterSolution_intIndexBased(input);
+    direct_solver->GetNodes()->SetAdjIndices(input);
+  }
+  else {
+    direct_solver->GetNodes()->RegisterSolution(input);
+  }
+//  direct_solver->GetNodes()->RegisterSolution(input);
 
   if (dynamic) {
     /*--- Register acceleration (u'') and velocity (u') at time step n ---*/
@@ -616,7 +630,13 @@ void CDiscAdjFEASolver::ExtractAdjoint_Solution(CGeometry *geometry, CConfig *co
 
     /*--- Extract the adjoint solution ---*/
 
-    direct_solver->GetNodes()->GetAdjointSolution(iPoint,Solution);
+    if(config->GetMultizone_Problem()) {
+      direct_solver->GetNodes()->GetAdjointSolution_intIndexBased(iPoint,Solution);
+    }
+    else {
+      direct_solver->GetNodes()->GetAdjointSolution(iPoint,Solution);
+    }
+//    direct_solver->GetNodes()->GetAdjointSolution(iPoint,Solution);
 
     /*--- Store the adjoint solution ---*/
 

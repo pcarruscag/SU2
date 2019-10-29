@@ -2985,17 +2985,26 @@ void CSolver::SetSolution_Gradient_LS(CGeometry *geometry, CConfig *config) {
 void CSolver::Add_ExternalOld_To_Solution(CGeometry *geometry) {
   for (unsigned long iPoint = 0; iPoint < geometry->GetnPoint(); iPoint++) {
     base_nodes->AddSolution(iPoint, base_nodes->Get_ExternalOld(iPoint));
+//    for (unsigned short iVar = 0; iVar < nVar; iVar++)
+//      cout << base_nodes->GetSolution(iPoint,iVar) << "\t";
+//    cout << endl;
   }
 }
 
 void CSolver::Add_Solution_To_External(CGeometry *geometry) {
   for (unsigned long iPoint = 0; iPoint < geometry->GetnPoint(); iPoint++) {
+//    for (unsigned short iVar = 0; iVar < nVar; iVar++)
+//      cout << base_nodes->GetSolution(iPoint,iVar) << "\t";
+//    cout << endl;
     base_nodes->Add_External(iPoint, base_nodes->GetSolution(iPoint));
   }
 }
 
 void CSolver::Add_Solution_To_ExternalOld(CGeometry *geometry) {
   for (unsigned long iPoint = 0; iPoint < geometry->GetnPoint(); iPoint++) {
+//    for (unsigned short iVar = 0; iVar < nVar; iVar++)
+//      cout << base_nodes->GetSolution(iPoint,iVar) << "\t";
+//    cout << endl;
     base_nodes->Add_ExternalOld(iPoint, base_nodes->GetSolution(iPoint));
   }
 }

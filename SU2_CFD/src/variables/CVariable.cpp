@@ -91,7 +91,8 @@ CVariable::CVariable(unsigned long npoint, unsigned long ndim, unsigned long nva
 
 void CVariable::Set_OldSolution() { Solution_Old = Solution; }
 
-void CVariable::Set_Solution() { Solution = Solution_Old; }
+//void CVariable::Set_Solution() { Solution = Solution_Old; }
+void CVariable::Set_Solution() { Solution = Solution_BGS_k; }
 
 void CVariable::Set_Solution_time_n() { Solution_time_n = Solution; }
 
