@@ -822,7 +822,7 @@ void CDiscAdjMultizoneDriver::ComputeAdjoints(unsigned short iZone) {
   /*--- Interpret the stored information by calling the corresponding routine of the AD tool. ---*/
 
   AD::ComputeAdjoint(enter_izone, leave_izone);
-
+  // PG: Here we can avoid computing the mesh solver for inner iters based on boolean
   AD::ComputeAdjoint(TRANSFER, OBJECTIVE_FUNCTION);
   AD::ComputeAdjoint(DEPENDENCIES, START);
 }
