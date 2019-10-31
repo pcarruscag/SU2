@@ -438,12 +438,12 @@ void CDiscAdjFEASolver::RegisterSolution(CGeometry *geometry, CConfig *config){
 
   /*--- Register solution at all necessary time instances and other variables on the tape ---*/
 
-  if(config->GetMultizone_Problem()) {
+//  if(config->GetMultizone_Problem()) {
     direct_solver->GetNodes()->RegisterSolution_intIndexBased(input);
     direct_solver->GetNodes()->SetAdjIndices(input);
-  } else {
-    direct_solver->GetNodes()->RegisterSolution(input);
-  }
+//  } else {
+//    direct_solver->GetNodes()->RegisterSolution(input);
+//  }
   
 //  direct_solver->GetNodes()->RegisterSolution(input);
 
@@ -497,6 +497,9 @@ void CDiscAdjFEASolver::RegisterVariables(CGeometry *geometry, CConfig *config, 
       for (iVar = 0; iVar < nMPROP; iVar++) AD::RegisterInput(Rho_i[iVar]);
       for (iVar = 0; iVar < nMPROP; iVar++) AD::RegisterInput(Rho_DL_i[iVar]);
 
+      AD::SetAdjIndex(index_E,E_i[0]);
+      cout << "E0 index: " << index_E << endl;
+      
       if(de_effects){
         for (iVar = 0; iVar < nEField; iVar++) AD::RegisterInput(EField[iVar]);
       }
@@ -508,9 +511,9 @@ void CDiscAdjFEASolver::RegisterVariables(CGeometry *geometry, CConfig *config, 
       if (config->GetTopology_Optimization())
         direct_solver->RegisterVariables(geometry,config);
 
-      /*--- Register the flow traction sensitivities ---*/
-      if (config->GetnMarker_Fluid_Load() > 0)
-        direct_solver->GetNodes()->RegisterFlowTraction();
+//      /*--- Register the flow traction sensitivities ---*/
+//      if (config->GetnMarker_Fluid_Load() > 0)
+//        direct_solver->GetNodes()->RegisterFlowTraction();
     }
 
   }
@@ -630,12 +633,12 @@ void CDiscAdjFEASolver::ExtractAdjoint_Solution(CGeometry *geometry, CConfig *co
 
     /*--- Extract the adjoint solution ---*/
 
-    if(config->GetMultizone_Problem()) {
+//    if(config->GetMultizone_Problem()) {
       direct_solver->GetNodes()->GetAdjointSolution_intIndexBased(iPoint,Solution);
-    }
-    else {
-      direct_solver->GetNodes()->GetAdjointSolution(iPoint,Solution);
-    }
+//    }
+//    else {
+//      direct_solver->GetNodes()->GetAdjointSolution(iPoint,Solution);
+//    }
 //    direct_solver->GetNodes()->GetAdjointSolution(iPoint,Solution);
 
     /*--- Store the adjoint solution ---*/
@@ -761,11 +764,14 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
 
   if (KindDirect_Solver == RUNTIME_FEA_SYS){
 
-    for (iVar = 0; iVar < nMPROP; iVar++) Local_Sens_E[iVar]  = SU2_TYPE::GetDerivative(E_i[iVar]);
+//    for (iVar = 0; iVar < nMPROP; iVar++) Local_Sens_E[iVar]  = SU2_TYPE::GetDerivative(E_i[iVar]);
+    Local_Sens_E[0] = AD::GetDerivative(index_E);
     for (iVar = 0; iVar < nMPROP; iVar++) Local_Sens_Nu[iVar] = SU2_TYPE::GetDerivative(Nu_i[iVar]);
     for (iVar = 0; iVar < nMPROP; iVar++) Local_Sens_Rho[iVar] = SU2_TYPE::GetDerivative(Rho_i[iVar]);
     for (iVar = 0; iVar < nMPROP; iVar++) Local_Sens_Rho_DL[iVar] = SU2_TYPE::GetDerivative(Rho_DL_i[iVar]);
 
+    cout << Local_Sens_E[0] << endl;
+    
 #ifdef HAVE_MPI
     SU2_MPI::Allreduce(Local_Sens_E,  Global_Sens_E,  nMPROP, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     SU2_MPI::Allreduce(Local_Sens_Nu, Global_Sens_Nu, nMPROP, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -808,15 +814,15 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
       direct_solver->ExtractAdjoint_Variables(geometry,config);
 
     /*--- Extract the flow traction sensitivities ---*/
-    if (config->GetnMarker_Fluid_Load() > 0){
-      su2double val_sens;
-      for (unsigned long iPoint = 0; iPoint < nPoint; iPoint++){
-        for (unsigned short iDim = 0; iDim < nDim; iDim++){
-          val_sens = direct_solver->GetNodes()->ExtractFlowTraction_Sensitivity(iPoint,iDim);
-          nodes->SetFlowTractionSensitivity(iPoint, iDim, val_sens);
-        }
-      }
-    }
+//    if (config->GetnMarker_Fluid_Load() > 0){
+//      su2double val_sens;
+//      for (unsigned long iPoint = 0; iPoint < nPoint; iPoint++){
+//        for (unsigned short iDim = 0; iDim < nDim; iDim++){
+//          val_sens = direct_solver->GetNodes()->ExtractFlowTraction_Sensitivity(iPoint,iDim);
+//          nodes->SetFlowTractionSensitivity(iPoint, iDim, val_sens);
+//        }
+//      }
+//    }
 
   }
 
@@ -826,8 +832,8 @@ void CDiscAdjFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *c
 void CDiscAdjFEASolver::SetAdjoint_Output(CGeometry *geometry, CConfig *config){
 
   bool dynamic = (config->GetTime_Domain());
-  bool fsi = config->GetFSI_Simulation();
-  bool deform_mesh = (config->GetnMarker_Deform_Mesh() > 0);
+  bool fsi = false;//config->GetFSI_Simulation();
+  bool deform_mesh = false;//(config->GetnMarker_Deform_Mesh() > 0);
 
   unsigned short iVar;
   unsigned long iPoint;

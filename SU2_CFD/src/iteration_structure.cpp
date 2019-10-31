@@ -1596,7 +1596,9 @@ void CFEAIteration::Iterate(COutput *output,
 
   }
 
-
+  // PG: Need to encapsulate this for re-use in the multiphysics adjoint which has
+  //     a different way of recording the OF (not bundled with the direct iteration).
+  
   /*--- Finally, we need to compute the objective function, in case that we are running a discrete adjoint solver... ---*/
 
   switch (config[val_iZone]->GetKind_ObjFunc()){
@@ -3036,7 +3038,7 @@ void CDiscAdjFEAIteration::InitializeAdjoint(CSolver *****solver, CGeometry ****
 
   /*--- Initialize the adjoint of the objective function (typically with 1.0) ---*/
 
-  solver[iZone][iInst][MESH_0][ADJFEA_SOL]->SetAdj_ObjFunc(geometry[iZone][iInst][MESH_0], config[iZone]);
+//  solver[iZone][iInst][MESH_0][ADJFEA_SOL]->SetAdj_ObjFunc(geometry[iZone][iInst][MESH_0], config[iZone]);
 
   /*--- Initialize the adjoints the conservative variables ---*/
 

@@ -12766,6 +12766,8 @@ private:
 
   CDiscAdjFEABoundVariable* nodes = nullptr;  /*!< \brief The highest level in the variable hierarchy this solver can safely use. */
 
+  int index_E = 0;
+  
   /*!
    * \brief Return nodes to allow CSolver::base_nodes to be set.
    */

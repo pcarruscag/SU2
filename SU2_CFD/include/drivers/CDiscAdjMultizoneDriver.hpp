@@ -137,7 +137,7 @@ public:
    * \brief Summary of all routines to evaluate the adjoints in iZone.
    * \param[in] iZone - Zone in which adjoints are evaluated depending on their (preceding) seeding.
    */
-  void ComputeAdjoints(unsigned short iZone);
+  void ComputeAdjoints(unsigned short iZone, bool last_inner_iter = true);
 
   /*!
    * \brief Add External_Old vector to Solution.

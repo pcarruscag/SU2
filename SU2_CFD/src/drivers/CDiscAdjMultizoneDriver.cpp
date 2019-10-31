@@ -231,6 +231,8 @@ void CDiscAdjMultizoneDriver::Run() {
       /*--- Add the objective function contribution to the external contributions for solvers in iZone. ---*/
 
       Add_Solution_To_ExternalOld(iZone); // PG: puts the OF back in External_Old
+      
+//      char a; cin >> a;
 
       // PG: The solution of iZone has been modified, to start the adjoint from the same place
       //     we need to bring back the final inner iterate from BGSSolution_k.
@@ -255,7 +257,7 @@ void CDiscAdjMultizoneDriver::Run() {
       
         /*--- Evaluate the tape section belonging to solvers in iZone. ---*/
 
-        ComputeAdjoints(iZone);
+        ComputeAdjoints(iZone, iInner_Iter==nInnerIter[iZone]-1);
 
         /*--- Extracting adjoints for solvers in iZone w.r.t. to outputs in iZone (diagonal part). ---*/
 
@@ -748,26 +750,35 @@ void CDiscAdjMultizoneDriver::SetObjFunction(unsigned short kind_recording) {
         break;
 
         case DISC_ADJ_FEM:
+        {
+          auto geometry = geometry_container[iZone][INST_0][MESH_0];
+          auto solver  = solver_container[iZone][INST_0][MESH_0];
+          auto config = config_container[iZone];
 
-        switch(config_container[iZone]->GetKind_ObjFunc()) {
+          switch(config_container[iZone]->GetKind_ObjFunc()) {
 
-          case REFERENCE_NODE:
-            ObjFunc += solver_container[iZone][INST_0][MESH_0][FEA_SOL]->GetTotal_OFRefNode()*Weight_ObjFunc;
-            break;
-          case REFERENCE_GEOMETRY:
-            ObjFunc += solver_container[iZone][INST_0][MESH_0][FEA_SOL]->GetTotal_OFRefGeom()*Weight_ObjFunc;
-            break;
-          case TOPOL_COMPLIANCE:
-            ObjFunc += solver_container[iZone][INST_0][MESH_0][FEA_SOL]->GetTotal_OFCompliance()*Weight_ObjFunc;
-            break;
-          case VOLUME_FRACTION:
-          case TOPOL_DISCRETENESS:
-            ObjFunc += solver_container[iZone][INST_0][MESH_0][FEA_SOL]->GetTotal_OFVolFrac()*Weight_ObjFunc;
-            break;
+            case REFERENCE_NODE:
+              solver[FEA_SOL]->Compute_OFRefNode(geometry, solver, config);
+              ObjFunc += solver[FEA_SOL]->GetTotal_OFRefNode()*Weight_ObjFunc;
+              break;
+            case REFERENCE_GEOMETRY:
+              solver[FEA_SOL]->Compute_OFRefGeom(geometry, solver, config);
+              ObjFunc += solver[FEA_SOL]->GetTotal_OFRefGeom()*Weight_ObjFunc;
+              break;
+            case TOPOL_COMPLIANCE:
+              solver[FEA_SOL]->Compute_OFCompliance(geometry, solver, config);
+              ObjFunc += solver[FEA_SOL]->GetTotal_OFCompliance()*Weight_ObjFunc;
+              break;
+            case VOLUME_FRACTION:
+            case TOPOL_DISCRETENESS:
+              solver[FEA_SOL]->Compute_OFVolFrac(geometry, solver, config);
+              ObjFunc += solver[FEA_SOL]->GetTotal_OFVolFrac()*Weight_ObjFunc;
+              break;
 
-          default:
-            cout << "Objective function not covered for discrete adjoint multiphysics." << endl;
-            break;
+            default:
+              cout << "Objective function not covered for discrete adjoint multiphysics." << endl;
+              break;
+          }
         }
         break;
 
@@ -807,7 +818,7 @@ void CDiscAdjMultizoneDriver::SetAdj_ObjFunction() {
   }
 }
 
-void CDiscAdjMultizoneDriver::ComputeAdjoints(unsigned short iZone) {
+void CDiscAdjMultizoneDriver::ComputeAdjoints(unsigned short iZone, bool last_inner_iter) {
 
   unsigned short enter_izone = iZone*2+1 + ITERATION_READY;
   unsigned short leave_izone = iZone*2 + ITERATION_READY;
@@ -823,8 +834,10 @@ void CDiscAdjMultizoneDriver::ComputeAdjoints(unsigned short iZone) {
 
   AD::ComputeAdjoint(enter_izone, leave_izone);
   // PG: Here we can avoid computing the mesh solver for inner iters based on boolean
-  AD::ComputeAdjoint(TRANSFER, OBJECTIVE_FUNCTION);
-  AD::ComputeAdjoint(DEPENDENCIES, START);
+  if(last_inner_iter) {
+    AD::ComputeAdjoint(TRANSFER, OBJECTIVE_FUNCTION);
+  }
+    AD::ComputeAdjoint(DEPENDENCIES, START);
 }
 
 void CDiscAdjMultizoneDriver::Add_ExternalOld_To_Solution(unsigned short iZone) {
