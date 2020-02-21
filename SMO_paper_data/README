@@ -1,0 +1,5 @@
+A build script is provided with the data in **SMO_inv_design**
+
+fully_coupled (unpack data.tar.lrz using lrzip) contains scripts, data and
+reference results for the fully coupled step described in the paper.
+
