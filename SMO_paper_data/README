@@ -1,0 +1,7 @@
+build_script is how the code was build, dependencies (Eigen, PaStiX, Scotch, and OpenBLAS)
+need to be downloaded and build before hand, instructions for this are available in the
+TestCases folder of SU2 as part of its standard features.
+
+inv_design contains scripts and data (initial and final) for the inverse design step of
+the paper, without the stability metric. In inv_design_stability the metric is used.
+
