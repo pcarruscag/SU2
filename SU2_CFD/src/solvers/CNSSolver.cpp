@@ -350,8 +350,9 @@ void CNSSolver::Viscous_Residual(unsigned long iEdge, CGeometry *geometry, CSolv
 
   auto residual = numerics->ComputeResidual(config);
 
+  EdgeFluxes.SubtractBlock(iEdge, residual);
   if (ReducerStrategy) {
-    EdgeFluxes.SubtractBlock(iEdge, residual);
+//    EdgeFluxes.SubtractBlock(iEdge, residual);
     if (implicit)
       Jacobian.UpdateBlocksSub(iEdge, residual.jacobian_i, residual.jacobian_j);
   }
