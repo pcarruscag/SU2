@@ -41,6 +41,10 @@ CAvgGrad_Base::CAvgGrad_Base(unsigned short val_nDim,
 
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
+  ad_jacobian = config->GetUse_Accurate_Jacobians() &&
+                config->GetDiscrete_Adjoint() &&
+                config->GetAD_Preaccumulation();
+
   TauWall_i = 0; TauWall_j = 0;
 
   Mean_PrimVar = new su2double [nPrimVar];
@@ -584,6 +588,12 @@ CNumerics::ResidualType<> CAvgGrad_Flow::ComputeResidual(const CConfig* config) 
 
   unsigned short iVar, jVar, iDim;
 
+#if 0//def CODI_REVERSE_TYPE
+  for (iVar = jVar = 0; iVar < nDim+9; ++iVar)
+    jVar += (V_i[iVar].getGradientData()!=0);
+  const auto offset_Vj = jVar;
+#endif
+
   /*--- Normalized normal vector ---*/
 
   Area = 0.0;
@@ -687,6 +697,82 @@ CNumerics::ResidualType<> CAvgGrad_Flow::ComputeResidual(const CConfig* config) 
 
   AD::SetPreaccOut(Proj_Flux_Tensor, nVar);
   AD::EndPreacc();
+
+#if 0//def CODI_REVERSE_TYPE
+  if (implicit && ad_jacobian) {
+    /*--- "get" the raw result of the preaccumulation. ---*/
+    const auto& jacobie = AD::PreaccHelper.jacobie;
+    const auto nCols = AD::PreaccHelper.inputData.size();
+
+    /*--- "extract" the Jacobians wrt the primitives. ---*/
+    auto dF_dVi = [&](size_t iVar, size_t jVar) {
+      return jacobie[iVar*nCols+jVar];
+    };
+    auto dF_dVj = [&](size_t iVar, size_t jVar) {
+      return jacobie[iVar*nCols+offset_Vj+jVar];
+    };
+
+    const su2double Density_i = V_i[nDim+2], Density_j = V_j[nDim+2];
+    const su2double oneOnRhoi = 1.0/Density_i, oneOnRhoj = 1.0/Density_j;
+    const auto Velocity_i = &V_i[1], Velocity_j = &V_j[1];
+
+    /*--- For each conservative variable (column of the Jacobians). ---*/
+    if (!jacobie.empty() && (V_i[0].getGradientData() != 0))
+    for (jVar = 0; jVar < nVar; ++jVar) {
+
+      /*--- Partial derivatives of the primitives wrt to conservatives "jVar",
+       *    the order is {T, u, v, w, P, rho} (same as V_i and V_j). ---*/
+      su2double dVi_dUi[6] = {0.0};
+      su2double dVj_dUj[6] = {0.0};
+
+      if (jVar == 0) { // Density
+        su2double sq_veli = 0.0, sq_velj = 0.0;
+        for (iDim = 0; iDim < nDim; ++iDim) {
+          // -u,v,w / rho
+          dVi_dUi[iDim+1] = -Velocity_i[iDim] * oneOnRhoi;
+          dVj_dUj[iDim+1] = -Velocity_j[iDim] * oneOnRhoj;
+          // ||V||^2
+          sq_veli += Velocity_i[iDim] * Velocity_i[iDim];
+          sq_velj += Velocity_j[iDim] * Velocity_j[iDim];
+        }
+        dVi_dUi[0] = (0.5*Gamma_Minus_One*sq_veli/Gas_Constant - V_i[0])*oneOnRhoi;
+        dVj_dUj[0] = (0.5*Gamma_Minus_One*sq_velj/Gas_Constant - V_j[0])*oneOnRhoj;
+
+        dVi_dUi[nDim+1] = 0.5*Gamma_Minus_One*sq_veli;
+        dVj_dUj[nDim+1] = 0.5*Gamma_Minus_One*sq_velj;
+
+        dVi_dUi[nDim+2] = dVj_dUj[nDim+2] = 1.0;
+      }
+      else if (jVar+1 == nVar) { // rho*Energy
+        dVi_dUi[0] = Gamma_Minus_One/Gas_Constant*oneOnRhoi;
+        dVj_dUj[0] = Gamma_Minus_One/Gas_Constant*oneOnRhoj;
+        dVi_dUi[nDim+1] = dVj_dUj[nDim+1] = Gamma_Minus_One;
+      }
+      else { // Momentum
+        dVi_dUi[jVar] = oneOnRhoi;
+        dVj_dUj[jVar] = oneOnRhoj;
+
+        dVi_dUi[nDim+1] = -Gamma_Minus_One*Velocity_i[jVar-1];
+        dVj_dUj[nDim+1] = -Gamma_Minus_One*Velocity_j[jVar-1];
+
+        dVi_dUi[0] = dVi_dUi[nDim+1]/Gas_Constant*oneOnRhoi;
+        dVj_dUj[0] = dVj_dUj[nDim+1]/Gas_Constant*oneOnRhoj;
+      }
+
+      /*--- For each equation (row of the Jacobians). ---*/
+      for (iVar = 0; iVar < nVar; ++iVar) {
+        su2double doti = 0, dotj = 0;
+        for (auto kVar = 0; kVar < nPrimVar; ++kVar) {
+          doti += dF_dVi(iVar,kVar) * dVi_dUi[kVar];
+          dotj += dF_dVj(iVar,kVar) * dVj_dUj[kVar];
+        }
+        cout << fabs(doti-Jacobian_i[iVar][jVar])/(fabs(Jacobian_i[iVar][jVar])+1e-20) << "  ";
+        //Jacobian_i[iVar][jVar] = Jacobian_j[iVar][jVar] = 0.0;
+      }
+      cout << endl;
+    }
+  }
+#endif
 
   return ResidualType<>(Proj_Flux_Tensor, Jacobian_i, Jacobian_j);
 

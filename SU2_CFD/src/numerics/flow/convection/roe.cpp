@@ -35,6 +35,10 @@ CUpwRoeBase_Flow::CUpwRoeBase_Flow(unsigned short val_nDim, unsigned short val_n
   dynamic_grid = config->GetDynamic_Grid();
   kappa = config->GetRoe_Kappa(); // 1 is unstable
 
+  ad_jacobian = config->GetUse_Accurate_Jacobians() &&
+                config->GetDiscrete_Adjoint() &&
+                config->GetAD_Preaccumulation();
+
   Gamma = config->GetGamma();
   Gamma_Minus_One = Gamma - 1.0;
 
@@ -102,9 +106,8 @@ CNumerics::ResidualType<> CUpwRoeBase_Flow::ComputeResidual(const CConfig* confi
   if (dynamic_grid) {
     AD::SetPreaccIn(GridVel_i, nDim); AD::SetPreaccIn(GridVel_j, nDim);
   }
-  if (roe_low_dissipation){
-    AD::SetPreaccIn(Sensor_i); AD::SetPreaccIn(Sensor_j);
-    AD::SetPreaccIn(Dissipation_i); AD::SetPreaccIn(Dissipation_j);
+  if (roe_low_dissipation) {
+    AD::SetPreaccIn(Sensor_i, Sensor_j, Dissipation_i, Dissipation_j);
   }
 
   /*--- Face area (norm or the normal vector) and unit normal ---*/
@@ -246,6 +249,83 @@ CNumerics::ResidualType<> CUpwRoeBase_Flow::ComputeResidual(const CConfig* confi
 
   AD::SetPreaccOut(Flux, nVar);
   AD::EndPreacc();
+
+#ifdef CODI_REVERSE_TYPE
+  if (implicit && ad_jacobian) {
+    /*--- "get" the raw result of the preaccumulation. ---*/
+    const auto& jacobie = AD::PreaccHelper.jacobie;
+    const auto nCols = AD::PreaccHelper.inputData.size();
+
+    /*--- "extract" the Jacobians wrt the primitives. ---*/
+    auto dF_dVi = [&](size_t iVar, size_t jVar) {
+      /*--- jVar offset by 1 as the 1st index of the primitives is not used. ---*/
+      return jacobie[iVar*nCols+1+jVar];
+    };
+    auto dF_dVj = [&](size_t iVar, size_t jVar) {
+      /*--- move nDim+4 to access derivates wrt V_j. ---*/
+      return jacobie[iVar*nCols+nDim+4+1+jVar];
+    };
+
+    su2double oneOnRhoi = 1.0/Density_i, oneOnRhoj = 1.0/Density_j;
+
+    /*--- For each conservative variable (column of the Jacobians). ---*/
+    if (!jacobie.empty() && (V_i[1].getGradientData() != 0))
+    for (jVar = 0; jVar < nVar; ++jVar) {
+
+      /*--- Partial derivatives of the primitives wrt to conservatives "jVar",
+       *    the order is {u, v, w, P, rho, H} (same as V_i and V_j). ---*/
+      su2double dVi_dUi[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+      su2double dVj_dUj[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+      if (jVar == 0) { // Density
+        su2double sq_veli = 0.0, dHi_drhoi;
+        su2double sq_velj = 0.0, dHj_drhoj;
+        for (iDim = 0; iDim < nDim; ++iDim) {
+          // -u,v,w / rho
+          dVi_dUi[iDim] = -Velocity_i[iDim] * oneOnRhoi;
+          dVj_dUj[iDim] = -Velocity_j[iDim] * oneOnRhoj;
+          // ||V||^2
+          sq_veli += Velocity_i[iDim] * Velocity_i[iDim];
+          sq_velj += Velocity_j[iDim] * Velocity_j[iDim];
+        }
+        dVi_dUi[nDim] = 0.5*Gamma_Minus_One*sq_veli;
+        dVj_dUj[nDim] = 0.5*Gamma_Minus_One*sq_velj;
+
+        dVi_dUi[nDim+1] = dVj_dUj[nDim+1] = 1.0;
+
+        dHi_drhoi = 0.5*(Gamma-2.0)*sq_veli - Gamma*Pressure_i/((Gamma-1.0)*Density_i);
+        dHj_drhoj = 0.5*(Gamma-2.0)*sq_velj - Gamma*Pressure_j/((Gamma-1.0)*Density_j);
+        dVi_dUi[nDim+2] = dHi_drhoi * oneOnRhoi;
+        dVj_dUj[nDim+2] = dHj_drhoj * oneOnRhoj;
+      }
+      else if (jVar+1 == nVar) { // rho*Energy
+        dVi_dUi[nDim] = dVj_dUj[nDim] = Gamma_Minus_One;
+        dVi_dUi[nDim+2] = Gamma * oneOnRhoi;
+        dVj_dUj[nDim+2] = Gamma * oneOnRhoj;
+      }
+      else { // Momentum
+        dVi_dUi[jVar-1] = oneOnRhoi;
+        dVj_dUj[jVar-1] = oneOnRhoj;
+
+        dVi_dUi[nDim] = -Gamma_Minus_One*Velocity_i[jVar-1];
+        dVj_dUj[nDim] = -Gamma_Minus_One*Velocity_j[jVar-1];
+
+        dVi_dUi[nDim+2] = dVi_dUi[nDim] * oneOnRhoi;
+        dVj_dUj[nDim+2] = dVj_dUj[nDim] * oneOnRhoj;
+      }
+
+      /*--- For each equation (row of the Jacobians). ---*/
+      for (iVar=0; iVar<nVar; ++iVar) {
+        Jacobian_i[iVar][jVar] = Jacobian_j[iVar][jVar] = 0.0;
+        /*--- For each primitive variable. ---*/
+        for (auto kVar = 0; kVar < nVar+1; ++kVar) {
+          Jacobian_i[iVar][jVar] += dF_dVi(iVar,kVar) * dVi_dUi[kVar];
+          Jacobian_j[iVar][jVar] += dF_dVj(iVar,kVar) * dVj_dUj[kVar];
+        }
+      }
+    }
+  }
+#endif
 
   return ResidualType<>(Flux, Jacobian_i, Jacobian_j);
 
