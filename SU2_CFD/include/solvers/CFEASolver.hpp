@@ -83,10 +83,12 @@ protected:
   CSysVector<su2double> LinSysReact;  /*!< \brief Vector to store the residual before applying the BCs */
 
 #ifndef CODI_FORWARD_TYPE
-  CSysMatrix<su2mixedfloat> MassMatrix;   /*!< \brief Sparse structure for storing the mass matrix. */
+  CSysMatrix<passivedouble> MassMatrix;   /*!< \brief Sparse structure for storing the mass matrix. */
 #else
   CSysMatrix<su2double> MassMatrix;
 #endif
+  CSysMatrix<passivedouble> Jacobian;
+  CSysSolve<passivedouble> System;
 
   CElement*** element_container = nullptr;  /*!< \brief Vector which the define the finite element structure for each problem. */
   CProperty** element_properties = nullptr; /*!< \brief Vector which stores the properties of each element */
