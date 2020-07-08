@@ -36,7 +36,7 @@
 using namespace GeometryToolbox;
 
 
-CFEASolver::CFEASolver(bool mesh_deform_mode) : CSolver(mesh_deform_mode) {
+CFEASolver::CFEASolver(bool mesh_deform_mode) : CSolver(mesh_deform_mode), System(mesh_deform_mode) {
 
   nElement = 0;
   nDim = 0;
