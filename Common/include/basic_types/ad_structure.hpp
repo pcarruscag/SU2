@@ -2,7 +2,7 @@
  * \file ad_structure.hpp
  * \brief Main routines for the algorithmic differentiation (AD) structure.
  * \author T. Albring
- * \version 7.0.5 "Blackbird"
+ * \version 7.0.6 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -380,6 +380,18 @@ namespace AD{
       for (int j = 0; j < size_y; j++) {
         if (data[i][j].isActive()) {
           PreaccHelper.addInput(data[i][j]);
+        }
+      }
+    }
+  }
+
+  template<class T>
+  FORCEINLINE void SetPreaccIn(const T& data, const int size_x, const int size_y, const int size_z) {
+    if (!PreaccActive) return;
+    for (int i = 0; i < size_x; i++) {
+      for (int j = 0; j < size_y; j++) {
+        for (int k = 0; k < size_z; k++) {
+          if (data[i][j][k].isActive()) PreaccHelper.addInput(data[i][j][k]);
         }
       }
     }

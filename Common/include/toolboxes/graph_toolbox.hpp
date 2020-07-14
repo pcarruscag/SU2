@@ -2,7 +2,7 @@
  * \file graph_toolbox.hpp
  * \brief Functions and classes to build/represent sparse graphs or sparse patterns.
  * \author P. Gomes
- * \version 7.0.5 "Blackbird"
+ * \version 7.0.6 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -240,8 +240,8 @@ public:
    * \return Iterator to inner dimension to use in range for loops.
    */
   inline CInnerIter getInnerIter(Index_t iOuterIdx) const {
-    return CInnerIter(&m_innerIdx(m_outerPtr(iOuterIdx)),
-                      &m_innerIdx(m_outerPtr(iOuterIdx+1)));
+    return CInnerIter(m_innerIdx.data()+m_outerPtr(iOuterIdx),
+                      m_innerIdx.data()+m_outerPtr(iOuterIdx+1));
   }
 
   /*!

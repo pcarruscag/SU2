@@ -3,7 +3,7 @@
 ## \file parallel_regression.py
 #  \brief Python script for automated regression testing of SU2 examples
 #  \author A. Aranake, A. Campos, T. Economon, T. Lukaczyk, S. Padron
-#  \version 7.0.5 "Blackbird"
+#  \version 7.0.6 "Blackbird"
 #
 # SU2 Project Website: https://su2code.github.io
 #
@@ -243,7 +243,7 @@ def main():
     turb_naca0012_sa.cfg_dir   = "rans/naca0012"
     turb_naca0012_sa.cfg_file  = "turb_NACA0012_sa.cfg"
     turb_naca0012_sa.test_iter = 10
-    turb_naca0012_sa.test_vals = [-12.078401, -16.147829, 1.064326, 0.019770] #last 4 columns
+    turb_naca0012_sa.test_vals = [-11.155389, -14.463873, 1.064330, 0.019756] #last 4 columns
     turb_naca0012_sa.su2_exec  = "parallel_computation.py -f"
     turb_naca0012_sa.timeout   = 3200
     turb_naca0012_sa.tol       = 0.00001
@@ -254,7 +254,7 @@ def main():
     turb_naca0012_sst.cfg_dir   = "rans/naca0012"
     turb_naca0012_sst.cfg_file  = "turb_NACA0012_sst.cfg"
     turb_naca0012_sst.test_iter = 10
-    turb_naca0012_sst.test_vals = [-15.273461, -6.243802, 1.049988, 0.019165] #last 4 columns
+    turb_naca0012_sst.test_vals = [-12.799281, -5.875249, 1.049989, 0.019163] #last 4 columns
     turb_naca0012_sst.su2_exec  = "parallel_computation.py -f"
     turb_naca0012_sst.timeout   = 3200
     turb_naca0012_sst.tol       = 0.00001
@@ -265,7 +265,7 @@ def main():
     turb_naca0012_sst_sust.cfg_dir   = "rans/naca0012"
     turb_naca0012_sst_sust.cfg_file  = "turb_NACA0012_sst_sust.cfg"
     turb_naca0012_sst_sust.test_iter = 10
-    turb_naca0012_sst_sust.test_vals = [-14.851212, -6.062226, 1.005233, 0.019014] #last 4 columns
+    turb_naca0012_sst_sust.test_vals = [-12.641091, -5.753516, 1.005233, 0.019017] #last 4 columns
     turb_naca0012_sst_sust.su2_exec  = "parallel_computation.py -f"
     turb_naca0012_sst_sust.timeout   = 3200
     turb_naca0012_sst_sust.tol       = 0.00001
@@ -281,6 +281,17 @@ def main():
     propeller.timeout   = 3200
     propeller.tol       = 0.00001
     test_list.append(propeller)
+
+    # PROPELLER VARIBLE LOAD
+    propeller_var_load           = TestCase('propeller_variable_load')
+    propeller_var_load.cfg_dir   = "rans/actuatordisk_variable_load"
+    propeller_var_load.cfg_file  = "propeller_variable_load.cfg"
+    propeller_var_load.test_iter = 20
+    propeller_var_load.test_vals = [-1.839227, -4.535048, -0.000314, 0.169980] #last 4 columns
+    propeller_var_load.su2_exec  = "parallel_computation.py -f"
+    propeller_var_load.timeout   = 3200
+    propeller_var_load.tol       = 0.00001
+    test_list.append(propeller_var_load)
 
     #################################
     ## Compressible RANS Restart  ###
@@ -1172,7 +1183,7 @@ def main():
     pywrapper_turb_naca0012_sst.cfg_dir   = "rans/naca0012"
     pywrapper_turb_naca0012_sst.cfg_file  = "turb_NACA0012_sst.cfg"
     pywrapper_turb_naca0012_sst.test_iter = 10
-    pywrapper_turb_naca0012_sst.test_vals = [-15.273461, -6.243802, 1.049988, 0.019165] #last 4 columns
+    pywrapper_turb_naca0012_sst.test_vals = [-12.799281, -5.875249, 1.049989, 0.019163] #last 4 columns
     pywrapper_turb_naca0012_sst.su2_exec  = "mpirun -np 2 SU2_CFD.py --parallel -f"
     pywrapper_turb_naca0012_sst.timeout   = 3200
     pywrapper_turb_naca0012_sst.tol       = 0.00001

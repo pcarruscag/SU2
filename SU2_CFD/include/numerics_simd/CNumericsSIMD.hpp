@@ -2,7 +2,7 @@
  * \file CNumericsSIMD.hpp
  * \brief Vectorized (SIMD) numerics classes.
  * \author P. Gomes
- * \version 7.0.5 "Blackbird"
+ * \version 7.0.6 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -39,20 +39,12 @@
 enum class UpdateType {COLORING, REDUCTION};
 
 /*!
- * \brief Define Double and Int types, SIMD for normal mode, scalar for AD.
+ * \brief Define Double and Int SIMD types.
  */
-#if !defined(CODI_REVERSE_TYPE) && !defined(CODI_FORWARD_TYPE)
-/*--- Scalar types (SIMD). ---*/
 using Double = simd::Array<su2double>;
 using Int = simd::Array<unsigned long, Double::Size>;
-constexpr size_t IntSize = Int::Size;
-#else
-/*--- No SIMD with AD. ---*/
-using Double = su2double;
-using Int = unsigned long;
-constexpr size_t IntSize = 1;
-#endif
 
+/*--- Forward declare a few classes used in name only by the interface. ---*/
 template<class T> class CSysVector;
 template<class T> class CSysMatrix;
 class CConfig;
