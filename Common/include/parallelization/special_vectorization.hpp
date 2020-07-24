@@ -25,7 +25,7 @@
  * License along with SU2. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// no #pragma once, it needs to be included once per specialization.
+// no #pragma once, header needs to be included once per specialization.
 
 /*!
  * \brief Symbols that need to be defined before including this header:
@@ -42,6 +42,8 @@
 template<>
 class ARRAY_T {
 #define FOREACH SU2_OMP_SIMD for(size_t k=0; k<Size; ++k)
+  template<class F, class S>
+  FORCEINLINE static S second(F, S s) { return s; }
 public:
   using Scalar = SCALAR_T;
   using Register = REGISTER_T;
@@ -62,7 +64,6 @@ public:
 
   FORCEINLINE Array(Register y) { reg = y; }
   FORCEINLINE Array(const Array& other) { reg = other.reg; }
-  FORCEINLINE Array& operator= (const Array& other) { reg = other.reg; return *this; }
 
   /*--- Specialized construction primitives. ---*/
 
@@ -75,11 +76,12 @@ public:
   template<class T>
   FORCEINLINE void gather(const Scalar* begin, const T& offsets) { FOREACH x_[k] = begin[offsets[k]]; }
 
-  /*--- Compound math operators, "this" is not returned because it generates poor assembly. ---*/
+  /*--- Compound assignement operators. ---*/
 
 #define MAKE_COMPOUND(OP,IMPL)\
-  FORCEINLINE void operator OP (Scalar x) { reg = IMPL(reg, set1_p(SIZE_TAG, x)); }\
-  FORCEINLINE void operator OP (const Array& other) { reg = IMPL(reg, other.reg); }
+  FORCEINLINE Array& operator OP (Scalar x) { reg = IMPL(reg, set1_p(SIZE_TAG, x)); return *this; }\
+  FORCEINLINE Array& operator OP (const Array& other) { reg = IMPL(reg, other.reg); return *this; }
+  MAKE_COMPOUND(=, second)
   MAKE_COMPOUND(+=, add_p)
   MAKE_COMPOUND(-=, sub_p)
   MAKE_COMPOUND(*=, mul_p)
@@ -99,6 +101,7 @@ FORCEINLINE ARRAY_T NAME(const ARRAY_T& x) {return IMPL(x.reg);}
 MAKE_UNARY_FUN(operator-, neg_p)
 MAKE_UNARY_FUN(sqrt, sqrt_p)
 MAKE_UNARY_FUN(abs, abs_p)
+MAKE_UNARY_FUN(sign, sign_p)
 
 #undef MAKE_UNARY_FUN
 
@@ -117,6 +120,12 @@ MAKE_BINARY_FUN(operator+, add_p)
 MAKE_BINARY_FUN(operator-, sub_p)
 MAKE_BINARY_FUN(operator*, mul_p)
 MAKE_BINARY_FUN(operator/, div_p)
+MAKE_BINARY_FUN(operator<, lt_p)
+MAKE_BINARY_FUN(operator>, gt_p)
+MAKE_BINARY_FUN(operator==, eq_p)
+MAKE_BINARY_FUN(operator!=, ne_p)
+MAKE_BINARY_FUN(operator<=, le_p)
+MAKE_BINARY_FUN(operator>=, ge_p)
 MAKE_BINARY_FUN(max, max_p)
 MAKE_BINARY_FUN(min, min_p)
 
@@ -126,28 +135,6 @@ MAKE_BINARY_FUN(min, min_p)
  * Compatibility mode overloads, element-wise implementation.
  */
 #define FOREACH SU2_OMP_SIMD for(size_t k=0; k<ARRAY_T::Size; ++k)
-
-/*--- Logical and relational operators, with arrays and scalars. ---*/
-
-#define MAKE_OPERATOR(OP)                                               \
-FORCEINLINE ARRAY_T operator OP (const ARRAY_T& a, const ARRAY_T& b) {  \
-  ARRAY_T res; FOREACH res[k] = a[k] OP b[k]; return res;               \
-}                                                                       \
-FORCEINLINE ARRAY_T operator OP (const ARRAY_T& a, SCALAR_T b) {        \
-  ARRAY_T res; FOREACH res[k] = a[k] OP b; return res;                  \
-}                                                                       \
-FORCEINLINE ARRAY_T operator OP (SCALAR_T b, const ARRAY_T& a) {        \
-  ARRAY_T res; FOREACH res[k] = b OP a[k]; return res;                  \
-}
-
-MAKE_OPERATOR(<)
-MAKE_OPERATOR(>)
-MAKE_OPERATOR(==)
-MAKE_OPERATOR(!=)
-MAKE_OPERATOR(<=)
-MAKE_OPERATOR(>=)
-
-#undef MAKE_OPERATOR
 
 /*--- Functions of one (array) argument. ---*/
 
