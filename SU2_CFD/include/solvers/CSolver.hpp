@@ -3,7 +3,7 @@
  * \brief Headers of the CSolver class which is inherited by all of the other
  *        solvers
  * \author F. Palacios, T. Economon
- * \version 7.0.6 "Blackbird"
+ * \version 7.0.7 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -50,7 +50,8 @@
 #include "../../../Common/include/linear_algebra/CSysMatrix.hpp"
 #include "../../../Common/include/linear_algebra/CSysVector.hpp"
 #include "../../../Common/include/linear_algebra/CSysSolve.hpp"
-#include "../../../Common/include/grid_movement_structure.hpp"
+#include "../../../Common/include/grid_movement/CSurfaceMovement.hpp"
+#include "../../../Common/include/grid_movement/CVolumetricMovement.hpp"
 #include "../../../Common/include/blas_structure.hpp"
 #include "../../../Common/include/graph_coloring_structure.hpp"
 #include "../../../Common/include/toolboxes/MMS/CVerificationSolution.hpp"
@@ -1402,6 +1403,22 @@ public:
                                                  CNumerics *numerics,
                                                  CConfig *config,
                                                  unsigned short val_marker) { }
+
+  /*!
+   * \brief A virtual member.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] conv_numerics - Description of the numerical method.
+   * \param[in] visc_numerics - Description of the numerical method.
+   * \param[in] config - Definition of the particular problem.
+   * \param[in] val_marker - Surface marker where the boundary condition is applied.
+   */
+  inline virtual void BC_Smoluchowski_Maxwell(CGeometry *geometry,
+                                              CSolver **solution_container,
+                                              CNumerics *conv_numerics,
+                                              CNumerics *visc_numerics,
+                                              CConfig *config,
+                                              unsigned short val_marker) { }
 
  /*!
    * \brief Get the outer state for fluid interface nodes.
@@ -3097,6 +3114,15 @@ public:
   inline virtual su2double GetCSkinFriction(unsigned short val_marker,
                                             unsigned long val_vertex,
                                             unsigned short val_dim) const { return 0; }
+
+  /*!
+   * \brief A virtual member.
+   * \param[in] val_marker - Surface marker where the wall shear stress is computed.
+   * \param[in] val_vertex - Vertex of the marker <i>val_marker</i> where the wall shear stress is evaluated.
+   * \return Value of the wall shear stress.
+   */
+  inline virtual su2double GetWallShearStress(unsigned short val_marker,
+                                              unsigned long val_vertex) const { return 0; }
 
   /*!
    * \brief A virtual member.

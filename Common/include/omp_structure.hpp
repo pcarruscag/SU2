@@ -13,7 +13,7 @@
  *       defined here with suitable fallback versions to limit the spread of
  *       compiler tricks in other areas of the code.
  * \author P. Gomes
- * \version 7.0.6 "Blackbird"
+ * \version 7.0.7 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -56,6 +56,7 @@
 #define SU2_OMP(ARGS) PRAGMIZE(omp ARGS)
 
 #else // Compile without OpenMP
+#include <ctime>
 
 /*--- Disable pragmas to quiet compilation warnings. ---*/
 #define SU2_OMP(ARGS)
@@ -86,6 +87,11 @@ inline constexpr int omp_get_thread_num() {return 0;}
 inline constexpr bool omp_in_parallel() {return false;}
 
 /*!
+ * \brief Return the wall time.
+ */
+inline passivedouble omp_get_wtime() {return passivedouble(clock()) / CLOCKS_PER_SEC;}
+
+/*!
  * \brief Dummy lock type and associated functions.
  */
 struct omp_lock_t {};
@@ -109,6 +115,12 @@ inline void omp_destroy_lock(omp_lock_t*){}
 #endif
 #ifndef SU2_OMP_SIMD
 #define SU2_OMP_SIMD
+#endif
+
+#if !defined(CODI_FORWARD_TYPE) && !defined(CODI_REVERSE_TYPE)
+#define SU2_OMP_SIMD_IF_NOT_AD SU2_OMP_SIMD
+#else
+#define SU2_OMP_SIMD_IF_NOT_AD
 #endif
 
 /*--- Convenience macros (do not use excessive nesting). ---*/
