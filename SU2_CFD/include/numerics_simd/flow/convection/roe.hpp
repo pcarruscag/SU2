@@ -2,7 +2,7 @@
  * \file roe.hpp
  * \brief Roe-family of convective schemes.
  * \author P. Gomes, A. Bueno, F. Palacios
- * \version 7.0.6 "Blackbird"
+ * \version 7.0.7 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -38,12 +38,12 @@
  * \class CRoeBase
  * \brief Base class for Roe schemes, derived classes implement
  * the dissipation term in a const "finalizeFlux" method.
- * A base class implementing "updateFlux" is accepted as template parameter.
+ * A base class implementing "viscousTerms" is accepted as template parameter.
  * Similarly to derived, that method should update the flux and Jacobians, but
- * whereas "finalizeFlux" is passed data prepared by CRoeBase, "updateFlux"
- * takes the same input arguments as "ComputeFlux", i.e. it must fetch the data
- * it needs from CVariable. Derived is meant to implement small details,
- * Base is meant to do heavy lifting like computing viscous fluxes.
+ * whereas "finalizeFlux" is passed data prepared by CRoeBase, "viscousTerms"
+ * takes the same input arguments as "ComputeFlux", i.e. it can fetch more
+ * data from CVariable. Derived is meant to implement small details,
+ * Base is meant to do heavy lifting.
  */
 template<class Derived, class Base>
 class CRoeBase : public Base {
@@ -199,13 +199,12 @@ public:
 
     /*--- Add the contributions from the base class (static decorator). ---*/
 
-    Base::updateFlux(iEdge, iPoint, jPoint, V1st, solution_, vector_ij, geometry,
-                     config, area, unitNormal, implicit, flux, jac_i, jac_j);
+    Base::viscousTerms(iEdge, iPoint, jPoint, V1st, solution_, vector_ij, geometry,
+                       config, area, unitNormal, implicit, flux, jac_i, jac_j);
 
     /*--- Stop preaccumulation. ---*/
 
-    AD::SetPreaccOut(flux, nVar, Double::Size);
-    AD::EndPreacc();
+    stopPreacc(flux);
 
     /*--- Update the vector and system matrix. ---*/
 

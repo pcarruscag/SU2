@@ -2,7 +2,7 @@
  * \file CEulerSolver.hpp
  * \brief Headers of the CEulerSolver class
  * \author F. Palacios, T. Economon
- * \version 7.0.6 "Blackbird"
+ * \version 7.0.7 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -367,6 +367,7 @@ public:
    */
   inline virtual void Viscous_Residual(unsigned long iEdge, CGeometry *geometry, CSolver **solver_container,
                                        CNumerics *numerics, CConfig *config) { }
+  using CSolver::Viscous_Residual; /*--- Silence warning ---*/
 
   /*!
    * \brief Recompute the extrapolated quantities, after MUSCL reconstruction,
@@ -452,6 +453,7 @@ public:
    */
   void SetPreconditioner(const CConfig *config, unsigned long iPoint,
                          su2double delta, su2double** preconditioner) const;
+  using CSolver::SetPreconditioner; /*--- Silence warning. ---*/
 
   /*!
    * \brief Parallelization of Undivided Laplacian.
