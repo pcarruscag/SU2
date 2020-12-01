@@ -1046,6 +1046,7 @@ private:
                 *top_optim_kernels,        /*!< \brief The kernels to use. */
                  top_optim_nKernelParams,  /*!< \brief Number of kernel parameters specified. */
                  top_optim_nRadius,        /*!< \brief Number of radius values specified. */
+                 top_optim_mpi_stride,     /*!< \brief Only 1 out of n ranks do the work to save memory. */
                  top_optim_search_lim;     /*!< \brief Limit the maximum "logical radius" considered during filtering. */
   su2double *top_optim_kernel_params,  /*!< \brief The kernel parameters. */
             *top_optim_filter_radius;  /*!< \brief Radius of the filter(s) used on the design density for topology optimization. */
@@ -8987,6 +8988,11 @@ public:
    * \brief Get the maximum "logical radius" (degree of neighborhood) to consider in the neighbor search.
    */
   unsigned short GetTopology_Search_Limit(void) const { return top_optim_search_lim; }
+
+  /*!
+   * \brief Get the mpi stride for topology optimization, only 1 out of n ranks do the work to save memory.
+   */
+  unsigned short GetTopology_MPI_Stride(void) const { return top_optim_mpi_stride; }
 
   /*!
    * \brief Get the type and parameter for the projection function used in topology optimization

@@ -1568,22 +1568,29 @@ public:
 
   /*!
    * \brief Filter values given at the element CG by performing a weighted average over a radial neighbourhood.
+   * \param[in] mpi_stride - Only one out of "n" ranks will perform the filtering to reduce memory usage.
    * \param[in] filter_radius - Parameter defining the size of the neighbourhood.
    * \param[in] kernels - Kernel types and respective parameter, size of vector defines number of filter recursions.
    * \param[in] search_limit - Max degree of neighborhood considered for neighbor search, avoids excessive work in fine regions.
    * \param[in,out] values - On entry, the "raw" values, on exit, the filtered values.
    */
-  void FilterValuesAtElementCG(const vector<su2double> &filter_radius, const vector<pair<unsigned short,su2double> > &kernels,
+  void FilterValuesAtElementCG(const unsigned short mpi_stride, const vector<su2double> &filter_radius,
+                               const vector<pair<unsigned short,su2double> > &kernels,
                                const unsigned short search_limit, su2double *values) const;
 
   /*!
    * \brief Build the global (entire mesh!) adjacency matrix for the elements in compressed format.
    *        Used by FilterValuesAtElementCG to search for geometrically close neighbours.
+   * \param[in] mpi_stride - Only one out of "n" ranks will contain the adjacency matrix to reduce memory usage.
+   * \param[out] global_index - Global indices of all ranks, only available on MASTER_NODE.
    * \param[out] neighbour_start - i'th position stores the start position in "neighbour_idx" for the immediate
-   *             neighbours of global element "i". Size nElemDomain+1
+   *             neighbours of global element "i". Size nElemDomain+1.
    * \param[out] neighbour_idx - Global index of the neighbours, mush be NULL on entry and free'd by calling function.
    */
-  void GetGlobalElementAdjacencyMatrix(vector<unsigned long> &neighbour_start, long *&neighbour_idx) const;
+  void GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
+                                       vector<unsigned long> &global_index,
+                                       vector<unsigned long> &neighbour_start,
+                                       vector<long> &neighbour_idx) const;
 
   /*!
    * \brief Get the neighbours of the global element in the first position of "neighbours" that are within "radius" of it.
@@ -1597,9 +1604,9 @@ public:
    * \param[in,out] is_neighbor - Working vector of size nElemGlobal, MUST be all false on entry (if so, on exit it will be the same).
    * \return true if the search was successful, i.e. not limited.
    */
-  bool GetRadialNeighbourhood(const unsigned long iElem_global, const passivedouble radius, size_t search_limit,
-                              const vector<unsigned long> &neighbour_start, const long *neighbour_idx,
-                              const su2double *cg_elem, vector<long> &neighbours, vector<bool> &is_neighbor) const;
+  bool GetRadialNeighbourhood(const unsigned long iElem_global, passivedouble radius, size_t search_limit,
+                              const vector<unsigned long> &neighbour_start, const vector<long> &neighbour_idx,
+                              const su2activematrix &cg_elem, vector<long> &neighbours, vector<bool> &is_neighbor) const;
 
   /*!
    * \brief Compute and store the volume of the elements.
