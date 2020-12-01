@@ -1046,6 +1046,7 @@ private:
                 *top_optim_kernels,        /*!< \brief The kernels to use. */
                  top_optim_nKernelParams,  /*!< \brief Number of kernel parameters specified. */
                  top_optim_nRadius,        /*!< \brief Number of radius values specified. */
+                 top_optim_mpi_stride,     /*!< \brief Only 1 out of n ranks do the work to save memory. */
                  top_optim_search_lim;     /*!< \brief Limit the maximum "logical radius" considered during filtering. */
   su2double *top_optim_kernel_params,  /*!< \brief The kernel parameters. */
             *top_optim_filter_radius;  /*!< \brief Radius of the filter(s) used on the design density for topology optimization. */
@@ -1109,7 +1110,6 @@ private:
   unsigned short Comm_Level;                 /*!< \brief Level of MPI communications to be performed. */
   unsigned short Kind_Verification_Solution; /*!< \brief Verification solution for accuracy assessment. */
 
-  ofstream *ConvHistFile;        /*!< \brief Store the pointer to each history file */
   bool Time_Domain;              /*!< \brief Determines if the multizone problem is solved in time-domain */
   unsigned long nOuterIter,      /*!< \brief Determines the number of outer iterations in the multizone problem */
   nInnerIter,                    /*!< \brief Determines the number of inner iterations in each multizone block */
@@ -1162,7 +1162,9 @@ private:
   su2double *Gas_Composition,               /*!< \brief Initial mass fractions of flow [dimensionless] */
   pnorm_heat;                               /*!< \brief pnorm for heat-flux. */
   bool frozen,                              /*!< \brief Flag for determining if mixture is frozen. */
-  ionization;                               /*!< \brief Flag for determining if free electron gas is in the mixture. */
+  ionization,                               /*!< \brief Flag for determining if free electron gas is in the mixture. */
+  vt_transfer_res_limit,                    /*!< \brief Flag for determining if residual limiting for source term VT-transfer is used. */
+  monoatomic;                               /*!< \brief Flag for monoatomic mixture. */
   string GasModel,                          /*!< \brief Gas Model. */
   *Wall_Catalytic;                          /*!< \brief Pointer to catalytic walls. */
 
@@ -5135,21 +5137,19 @@ public:
   bool GetHold_GridFixed(void) const { return Hold_GridFixed; }
 
   /*!
-   * \brief Get the kind of objective function. There are several options: Drag coefficient,
-   *        Lift coefficient, efficiency, etc.
-   * \note The objective function will determine the boundary condition of the adjoint problem.
-   * \return Kind of objective function.
-   */
-  unsigned short GetKind_ObjFunc(void) const { return Kind_ObjFunc[0]; }
-
-  /*!
    * \author H. Kline
    * \brief Get the kind of objective function. There are several options: Drag coefficient,
    *        Lift coefficient, efficiency, etc.
    * \note The objective function will determine the boundary condition of the adjoint problem.
+   * \param[in] val_obj
    * \return Kind of objective function.
    */
-  unsigned short GetKind_ObjFunc(unsigned short val_obj) const { return Kind_ObjFunc[val_obj]; }
+  unsigned short GetKind_ObjFunc(unsigned short val_obj = 0) const { return Kind_ObjFunc[val_obj]; }
+
+  /*!
+   * \brief Similar to GetKind_ObjFunc but returns the corresponding string.
+   */
+  string GetName_ObjFunc(unsigned short val_obj = 0) const;
 
   /*!
    * \author H. Kline
@@ -5177,12 +5177,6 @@ public:
    * Gradients are w.r.t density, velocity[3], and pressure. when 2D gradient w.r.t. 3rd component of velocity set to 0.
    */
   su2double GetCoeff_ObjChainRule(unsigned short iVar) const { return Obj_ChainRuleCoeff[iVar]; }
-
-  /*!
-   * \author H. Kline
-   * \brief Get the flag indicating whether to comput a combined objective.
-   */
-  bool GetComboObj(void);
 
   /*!
    * \brief Get the kind of sensitivity smoothing technique.
@@ -5269,6 +5263,16 @@ public:
    * \brief Indicates whether electron gas is present in the gas mixture.
    */
   bool GetIonization(void) const { return ionization; }
+
+  /*!
+   * \brief Indicates whether the VT source residual is limited.
+   */
+  bool GetVTTransferResidualLimiting(void) const { return vt_transfer_res_limit; }
+
+  /*!
+   * \brief Indicates if mixture is monoatomic.
+   */
+  bool GetMonoatomic(void) const { return monoatomic; }
 
   /*!
    * \brief Information about computing and plotting the equivalent area distribution.
@@ -8986,21 +8990,16 @@ public:
   unsigned short GetTopology_Search_Limit(void) const { return top_optim_search_lim; }
 
   /*!
+   * \brief Get the mpi stride for topology optimization, only 1 out of n ranks do the work to save memory.
+   */
+  unsigned short GetTopology_MPI_Stride(void) const { return top_optim_mpi_stride; }
+
+  /*!
    * \brief Get the type and parameter for the projection function used in topology optimization
    */
   void GetTopology_Optim_Projection(unsigned short &type, su2double &param) const {
     type = top_optim_proj_type;  param = top_optim_proj_param;
   }
-
-  /*!
-   * \brief Retrieve the ofstream of the history file for the current zone.
-   */
-  ofstream* GetHistFile(void) { return ConvHistFile; }
-
-  /*!
-   * \brief Set the ofstream of the history file for the current zone.
-   */
-  void SetHistFile(ofstream *HistFile) { ConvHistFile = HistFile; }
 
   /*!
    * \brief Get the filenames of the individual config files

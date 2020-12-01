@@ -161,6 +161,10 @@ public:
   static void Gather(void *sendbuf, int sendcnt,Datatype sendtype,
                      void *recvbuf, int recvcnt, Datatype recvtype, int root, Comm comm);
 
+  static void Gatherv(void *sendbuf, int sendcount, Datatype sendtype,
+                      void *recvbuf, int *recvcounts, int *displs,
+                      Datatype recvtype, int root, Comm comm);
+
   static void Scatter(void *sendbuf, int sendcnt,Datatype sendtype,
                       void *recvbuf, int recvcnt, Datatype recvtype, int root, Comm comm);
 
@@ -273,6 +277,10 @@ public:
 
   static void Gather(void *sendbuf, int sendcnt,Datatype sendtype,
                      void *recvbuf, int recvcnt, Datatype recvtype, int root, Comm comm);
+
+  static void Gatherv(void *sendbuf, int sendcount, Datatype sendtype,
+                      void *recvbuf, int *recvcounts, int *displs,
+                      Datatype recvtype, int root, Comm comm);
 
   static void Scatter(void *sendbuf, int sendcnt,Datatype sendtype,
                       void *recvbuf, int recvcnt, Datatype recvtype, int root, Comm comm);
@@ -404,6 +412,10 @@ public:
 
   static void Gather(void *sendbuf, int sendcnt, Datatype sendtype,
                      void *recvbuf, int recvcnt, Datatype recvtype, int root, Comm comm);
+
+  static void Gatherv(void *sendbuf, int sendcount, Datatype sendtype,
+                      void *recvbuf, int *recvcounts, int *displs,
+                      Datatype recvtype, int root, Comm comm);
 
   static void Scatter(void *sendbuf, int sendcnt, Datatype sendtype,
                       void *recvbuf, int recvcnt, Datatype recvtype, int root, Comm comm);

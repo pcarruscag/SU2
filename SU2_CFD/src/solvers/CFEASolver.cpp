@@ -461,6 +461,23 @@ void CFEASolver::Set_ElementProperties(CGeometry *geometry, CConfig *config) {
 
   }
 
+  if (topology_mode) {
+    // make a shell
+    for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
+      if (geometry->nodes->GetPhysicalBoundary(iPoint))
+        for (auto iElem : geometry->nodes->GetElems(iPoint))
+          element_properties[iElem]->SetDesignDensity(0.2);
+
+    geometry->SetElemVolume(config);
+
+    // freeze small elements
+    for (auto iElem=0ul; iElem<nElement; ++iElem) {
+      if (geometry->elem[iElem]->GetVolume() < 3e-9)
+        element_properties[iElem]->SetDesignDensity(0.2);
+    }
+  }
+
+
 }
 
 void CFEASolver::Set_Prestretch(CGeometry *geometry, CConfig *config) {
@@ -3437,7 +3454,8 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
     else                physical_rho[iElem] = rho;
   }
 
-  geometry->FilterValuesAtElementCG(filter_radius, kernels, search_lim, physical_rho);
+  geometry->FilterValuesAtElementCG(config->GetTopology_MPI_Stride(), filter_radius,
+                                    kernels, search_lim, physical_rho);
 
   SU2_OMP_PARALLEL
   {

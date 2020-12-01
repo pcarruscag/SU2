@@ -140,7 +140,6 @@ CConfig::CConfig(istream &case_buffer, unsigned short val_software, bool verb_hi
 
 }
 
-
 CConfig::CConfig(CConfig* config, char case_filename[MAX_STRING_SIZE], unsigned short val_software, unsigned short val_iZone, unsigned short val_nZone, bool verb_high) {
 
   caseName = config->GetCaseName();
@@ -355,7 +354,6 @@ void CConfig::addEnumOption(const string name, unsigned short & option_field, co
   option_map.insert(pair<string, COptionBase *>(name, val));
   return;
 }
-
 
 // input_size is the number of options read in from the config file
 template <class Tenum>
@@ -1010,8 +1008,6 @@ void CConfig::SetPointersNull(void) {
   nBlades                      = nullptr;
   FreeStreamTurboNormal        = nullptr;
 
-  ConvHistFile                 = nullptr;
-
   top_optim_kernels       = nullptr;
   top_optim_kernel_params = nullptr;
   top_optim_filter_radius = nullptr;
@@ -1165,6 +1161,10 @@ void CConfig::SetConfig_Options() {
   addBoolOption("FROZEN_MIXTURE", frozen, false);
   /* DESCRIPTION: Specify if there is ionization */
   addBoolOption("IONIZATION", ionization, false);
+  /* DESCRIPTION: Specify if there is VT transfer residual limiting */
+  addBoolOption("VT_RESIDUAL_LIMITING", vt_transfer_res_limit, false);
+  /* DESCRIPTION: Specify if the gas is monoatomic */
+  addBoolOption("MONOATOMIC", monoatomic, false);
   /* DESCRIPTION: List of catalytic walls */
   addStringListOption("CATALYTIC_WALL", nWall_Catalytic, Wall_Catalytic);
   /*!\brief MARKER_MONITORING\n DESCRIPTION: Marker(s) of the surface where evaluate the non-dimensional coefficients \ingroup Config*/
@@ -2407,6 +2407,7 @@ void CConfig::SetConfig_Options() {
   addDoubleListOption("TOPOL_OPTIM_FILTER_RADIUS", top_optim_nRadius, top_optim_filter_radius);
   addDoubleListOption("TOPOL_OPTIM_KERNEL_PARAM", top_optim_nKernelParams, top_optim_kernel_params);
   addUnsignedShortOption("TOPOL_OPTIM_SEARCH_LIMIT", top_optim_search_lim, 0);
+  addUnsignedShortOption("TOPOL_OPTIM_MPI_STRIDE", top_optim_mpi_stride, 1);
   addEnumOption("TOPOL_OPTIM_PROJECTION_TYPE", top_optim_proj_type, Projection_Function_Map, NO_PROJECTION);
   addDoubleOption("TOPOL_OPTIM_PROJECTION_PARAM", top_optim_proj_param, 0.0);
 
@@ -3062,10 +3063,7 @@ bool CConfig::SetRunTime_Parsing(char case_filename[MAX_STRING_SIZE]) {
 }
 
 void CConfig::SetHeader(unsigned short val_software) const{
-  /*--- WARNING: when compiling on Windows, ctime() is not available. Comment out
-   the two lines below that use the dt variable. ---*/
-  //time_t now = time(0);
-  //string dt = ctime(&now); dt[24] = '.';
+
   if ((iZone == 0) && (rank == MASTER_NODE)){
     cout << endl << "-------------------------------------------------------------------------" << endl;
     cout << "|    ___ _   _ ___                                                      |" << endl;
@@ -3081,7 +3079,6 @@ void CConfig::SetHeader(unsigned short val_software) const{
     }
 
     cout << "|                                                                       |" << endl;
-    //cout << "|   Local date and time: " << dt << "                      |" << endl;
     cout <<"-------------------------------------------------------------------------" << endl;
     cout << "| SU2 Project Website: https://su2code.github.io                        |" << endl;
     cout << "|                                                                       |" << endl;
@@ -3559,6 +3556,10 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
 
   if (nemo && Kind_FluidModel != USER_DEFINED_NONEQ ) {
     SU2_MPI::Error("Only USER_DEFINED_NONEQ fluid model can be used with the NEMO solver. Mutation++ library will soon be available.", CURRENT_FUNCTION);
+  }
+
+  if (nemo && Kind_TransCoeffModel != WILKE ) {
+    SU2_MPI::Error("Only WILKE transport model is stable for the NEMO solver.", CURRENT_FUNCTION);
   }
 
   if (!ideal_gas && !nemo) {
@@ -4990,6 +4991,8 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
                    (Kind_Solver == INC_RANS) ||
                    (Kind_Solver == EULER) ||
                    (Kind_Solver == NAVIER_STOKES) ||
+                   (Kind_Solver == NEMO_EULER) ||
+                   (Kind_Solver == NEMO_NAVIER_STOKES) ||
                    (Kind_Solver == RANS) ||
                    (Kind_Solver == DISC_ADJ_EULER) ||
                    (Kind_Solver == DISC_ADJ_RANS) ||
@@ -5600,15 +5603,15 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
       case NEMO_EULER:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible two-temperature thermochemical non-equilibrium Euler equations." << endl;
         if(Kind_FluidModel == USER_DEFINED_NONEQ){
-          if ((GasModel != "N2") && (GasModel != "AIR-5"))
-          SU2_MPI::Error("The GAS_MODEL given as input is not valid. Choose one of the options: N2, AIR-5.", CURRENT_FUNCTION);
+          if ((GasModel != "N2") && (GasModel != "AIR-5") && (GasModel != "ARGON"))
+          SU2_MPI::Error("The GAS_MODEL given as input is not valid. Choose one of the options: N2, AIR-5, ARGON.", CURRENT_FUNCTION);
         }
         break;
       case NEMO_NAVIER_STOKES:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible two-temperature thermochemical non-equilibrium Navier-Stokes equations." << endl;
         if(Kind_FluidModel == USER_DEFINED_NONEQ){
-          if ((GasModel != "N2") && (GasModel != "AIR-5"))
-          SU2_MPI::Error("The GAS_MODEL given as input is not valid. Choose one of the options: N2, AIR-5.", CURRENT_FUNCTION);
+          if ((GasModel != "N2") && (GasModel != "AIR-5") && (GasModel != "ARGON"))
+          SU2_MPI::Error("The GAS_MODEL given as input is not valid. Choose one of the options: N2, AIR-5, ARGON.", CURRENT_FUNCTION);
         }
         break;
       case FEM_LES:
@@ -6126,7 +6129,7 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
         if (Kind_Upwind_Flow == SLAU2)  cout << "Simple Low-Dissipation AUSM 2 solver for the flow inviscid terms."<< endl;
         if (Kind_Upwind_Flow == FDS)    cout << "Flux difference splitting (FDS) upwind scheme for the flow inviscid terms."<< endl;
         if (Kind_Upwind_Flow == AUSMPLUSUP)  cout << "AUSM+-up solver for the flow inviscid terms."<< endl;
-        if (Kind_Upwind_Flow == AUSMPLUSUP2)  cout << "AUSM+-up2 solver for the flow inviscid terms."<< endl;
+        if (Kind_Upwind_Flow == AUSMPLUSUP2) cout << "AUSM+-up2 solver for the flow inviscid terms."<< endl;
         if (Kind_Upwind_Flow == AUSMPWPLUS)  cout << "AUSMPWPLUS solver for the flow inviscid terms."<< endl;
 
         if (Kind_Solver == EULER         || Kind_Solver == DISC_ADJ_EULER ||
@@ -9299,6 +9302,13 @@ short CConfig::FindInterfaceMarker(unsigned short iInterface) const {
     if ((tag == sideA) || (tag == sideB)) return iMarker;
   }
   return -1;
+}
+
+string CConfig::GetName_ObjFunc(unsigned short val_obj) const {
+  for (auto item : Objective_Map)
+    if (item.second == static_cast<ENUM_OBJECTIVE>(Kind_ObjFunc[val_obj]))
+      return item.first;
+  return string();
 }
 
 void CConfig::Tick(double *val_start_time) {

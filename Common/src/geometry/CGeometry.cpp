@@ -28,6 +28,7 @@
 #include "../../include/geometry/CGeometry.hpp"
 #include "../../include/geometry/elements/CElement.hpp"
 #include "../../include/omp_structure.hpp"
+#include "../../include/toolboxes/geometry_toolbox.hpp"
 
 /*--- Cross product ---*/
 
@@ -3128,7 +3129,8 @@ void CGeometry::ComputeSurf_Curvature(CConfig *config) {
 
 }
 
-void CGeometry::FilterValuesAtElementCG(const vector<su2double> &filter_radius,
+void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
+                                        const vector<su2double> &filter_radius,
                                         const vector<pair<unsigned short,su2double> > &kernels,
                                         const unsigned short search_limit,
                                         su2double *values) const
@@ -3144,88 +3146,114 @@ void CGeometry::FilterValuesAtElementCG(const vector<su2double> &filter_radius,
 
 
   /*--- FIRST: Gather the adjacency matrix, element centroids, volumes, and values on every
-  processor, this is required because the filter reaches far into adjacent partitions. ---*/
+  active processor, this is required because the filter reaches far into adjacent partitions. ---*/
 
   /*--- Adjacency matrix ---*/
+  vector<unsigned long> global_index;
   vector<unsigned long> neighbour_start;
-  long *neighbour_idx = nullptr;
-  GetGlobalElementAdjacencyMatrix(neighbour_start,neighbour_idx);
+  vector<long> neighbour_idx;
+  GetGlobalElementAdjacencyMatrix(mpi_stride, global_index, neighbour_start, neighbour_idx);
 
   /*--- Element centroids and volumes. ---*/
-  su2double *cg_elem  = new su2double [Global_nElemDomain*nDim],
-            *vol_elem = new su2double [Global_nElemDomain];
-#ifdef HAVE_MPI
-  /*--- Number of subdomain each point is part of. ---*/
-  vector<char> halo_detect(Global_nElemDomain);
-#endif
+  su2activematrix cg_loc(nElem,nDim), cg_elem;
+  vector<su2double> vol_loc(nElem), vol_elem, work_elem;
 
-  /*--- Inputs of a filter stage, like with CG and volumes, each processor needs to see everything. ---*/
-  su2double *work_values = new su2double [Global_nElemDomain];
+  /*--- Populate ---*/
+  SU2_OMP_PARALLEL_(for schedule(static,256))
+  for(auto iElem=0ul; iElem<nElem; ++iElem) {
+    for(unsigned short iDim=0; iDim<nDim; ++iDim)
+      cg_loc(iElem,iDim) = elem[iElem]->GetCG(iDim);
+    vol_loc[iElem] = elem[iElem]->GetVolume();
+  }
+
+  unsigned long nElemGlobal = 0, nE = nElem;
+  SU2_MPI::Allreduce(&nE, &nElemGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+
+  if (rank == MASTER_NODE) {
+    cg_elem.resize(nElemGlobal,nDim);
+    vol_elem.resize(nElemGlobal);
+    work_elem.resize(nElemGlobal);
+  }
+
+  vector<int> counts(size), displs(size);
+  int tmp = nElem;
+  SU2_MPI::Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+  displs[0] = 0;
+  for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
+
+  SU2_MPI::Gatherv(vol_loc.data(), nElem, MPI_DOUBLE, vol_elem.data(), counts.data(),
+                   displs.data(), MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+
+  SU2_MPI::Gatherv(values, nElem, MPI_DOUBLE, work_elem.data(), counts.data(),
+                   displs.data(), MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+
+  for (auto& x : counts) x *= nDim;
+  for (auto& x : displs) x *= nDim;
+
+  SU2_MPI::Gatherv(cg_loc.data(), nElem*nDim, MPI_DOUBLE, cg_elem.data(), counts.data(),
+                   displs.data(), MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+
+  if (rank == MASTER_NODE) {
+    /*--- Master node re-orders data by global index and sends it to other active nodes. ---*/
+
+    swap(cg_loc, cg_elem);
+    swap(vol_loc, vol_elem);
+    auto work_loc = move(work_elem);
+
+    cg_elem.resize(Global_nElemDomain,nDim);
+    vol_elem.resize(Global_nElemDomain);
+    work_elem.resize(Global_nElemDomain);
+
+    SU2_OMP_PARALLEL_(for schedule(static,256))
+    for (unsigned long i = 0; i < nElemGlobal; ++i) {
+      auto iElem = global_index[i];
+      for(unsigned short iDim=0; iDim<nDim; ++iDim)
+        cg_elem(iElem,iDim) = cg_loc(i,iDim);
+      vol_elem[iElem] = vol_loc[i];
+      work_elem[iElem] = work_loc[i];
+    }
+
+    for (int p=0; p<size; p+=mpi_stride) {
+      if (p == MASTER_NODE) continue;
+      SU2_MPI::Send(cg_elem.data(), cg_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+      SU2_MPI::Send(vol_elem.data(), vol_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+      SU2_MPI::Send(work_elem.data(), work_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+    }
+  }
+  else if (rank % mpi_stride == 0) {
+    /*--- Other active nodes receive ordered data from master. ---*/
+
+    cg_elem.resize(Global_nElemDomain,nDim);
+    vol_elem.resize(Global_nElemDomain);
+    work_elem.resize(Global_nElemDomain);
+
+    SU2_MPI::Recv(cg_elem.data(), cg_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(vol_elem.data(), vol_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(work_elem.data(), work_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+
+  /*--- Counter for the total number of searches for which the recursion
+   limit is reached and the full neighborhood is not considered. ---*/
+  unsigned long limited_searches = 0;
+
+  /*--- Only active nodes filter. ---*/
+  if (rank % mpi_stride == 0) {
+
+  /*--- Partition the total work. ---*/
+  const auto chunk = roundUpDiv(Global_nElemDomain, size / mpi_stride);
+  const auto iElem_begin = rank / mpi_stride * chunk;
+  const auto iElem_end = min(iElem_begin + chunk, Global_nElemDomain);
+  const auto nElem_work = iElem_end - iElem_begin + 1;
+
+  vector<su2double> work_loc(nElem_work);
 
   /*--- When gathering the neighborhood of each element we use a vector of booleans to indicate
   whether an element is already added to the list of neighbors (one vector per thread). ---*/
   vector<vector<bool> > is_neighbor(omp_get_max_threads());
 
-  /*--- Begin OpenMP parallel section, count total number of searches for which
-  the recursion limit is reached and the full neighborhood is not considered. ---*/
-  unsigned long limited_searches = 0;
-
+  /*--- Begin OpenMP parallel section. ---*/
   SU2_OMP_PARALLEL_(reduction(+:limited_searches))
   {
-
-  /*--- Initialize ---*/
-  SU2_OMP_FOR_STAT(256)
-  for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem) {
-    for(unsigned short iDim=0; iDim<nDim; ++iDim)
-      cg_elem[nDim*iElem+iDim] = 0.0;
-    vol_elem[iElem] = 0.0;
-  }
-
-  /*--- Populate ---*/
-  SU2_OMP_FOR_STAT(256)
-  for(auto iElem=0ul; iElem<nElem; ++iElem) {
-    auto iElem_global = elem[iElem]->GetGlobalIndex();
-    for(unsigned short iDim=0; iDim<nDim; ++iDim)
-      cg_elem[nDim*iElem_global+iDim] = elem[iElem]->GetCG(iDim);
-    vol_elem[iElem_global] = elem[iElem]->GetVolume();
-  }
-
-#ifdef HAVE_MPI
-  /*--- Account for the duplication introduced by the halo elements and the
-  reduction using MPI_SUM, which is required to maintain differentiabillity. ---*/
-  SU2_OMP_FOR_STAT(256)
-  for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem)
-    halo_detect[iElem] = 0;
-
-  SU2_OMP_FOR_STAT(256)
-  for(auto iElem=0ul; iElem<nElem; ++iElem)
-    halo_detect[elem[iElem]->GetGlobalIndex()] = 1;
-
-  /*--- Share with all processors ---*/
-  SU2_OMP_MASTER
-  {
-    su2double* dbl_buffer = new su2double [Global_nElemDomain*nDim];
-    SU2_MPI::Allreduce(cg_elem,dbl_buffer,Global_nElemDomain*nDim,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-    swap(dbl_buffer, cg_elem); delete [] dbl_buffer;
-
-    dbl_buffer = new su2double [Global_nElemDomain];
-    SU2_MPI::Allreduce(vol_elem,dbl_buffer,Global_nElemDomain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-    swap(dbl_buffer, vol_elem); delete [] dbl_buffer;
-
-    vector<char> char_buffer(Global_nElemDomain);
-    MPI_Allreduce(halo_detect.data(),char_buffer.data(),Global_nElemDomain,MPI_CHAR,MPI_SUM,MPI_COMM_WORLD);
-    halo_detect.swap(char_buffer);
-  }
-  SU2_OMP_BARRIER
-
-  SU2_OMP_FOR_STAT(256)
-  for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem) {
-    su2double numRepeat = halo_detect[iElem];
-    for(unsigned short iDim=0; iDim<nDim; ++iDim)
-      cg_elem[nDim*iElem+iDim] /= numRepeat;
-    vol_elem[iElem] /= numRepeat;
-  }
-#endif
 
   /*--- SECOND: Each processor performs the average for its elements. For each
   element we look for neighbours of neighbours of... until the distance to the
@@ -3235,47 +3263,18 @@ void CGeometry::FilterValuesAtElementCG(const vector<su2double> &filter_radius,
 
   for (unsigned long iKernel=0; iKernel<kernels.size(); ++iKernel)
   {
-    unsigned short kernel_type = kernels[iKernel].first;
-    su2double kernel_param = kernels[iKernel].second;
-    su2double kernel_radius = filter_radius[iKernel];
-
-    /*--- Synchronize work values ---*/
-    /*--- Initialize ---*/
-    SU2_OMP_FOR_STAT(256)
-    for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem)
-      work_values[iElem] = 0.0;
-
-    /*--- Populate ---*/
-    SU2_OMP_FOR_STAT(256)
-    for(auto iElem=0ul; iElem<nElem; ++iElem)
-      work_values[elem[iElem]->GetGlobalIndex()] = values[iElem];
-
-#ifdef HAVE_MPI
-    /*--- Share with all processors ---*/
-    SU2_OMP_MASTER
-    {
-      su2double *buffer = new su2double [Global_nElemDomain];
-      SU2_MPI::Allreduce(work_values,buffer,Global_nElemDomain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-      swap(buffer, work_values); delete [] buffer;
-    }
-    SU2_OMP_BARRIER
-
-    /*--- Account for duplication ---*/
-    SU2_OMP_FOR_STAT(256)
-    for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem) {
-      su2double numRepeat = halo_detect[iElem];
-      work_values[iElem] /= numRepeat;
-    }
-#endif
+    const auto kernel_type = kernels[iKernel].first;
+    const auto kernel_param = kernels[iKernel].second;
+    const auto kernel_radius = filter_radius[iKernel];
 
     /*--- Filter ---*/
     SU2_OMP_FOR_DYN(128)
-    for(auto iElem=0ul; iElem<nElem; ++iElem)
+    for(auto iElem_global = iElem_begin; iElem_global < iElem_end; ++iElem_global)
     {
-      int thread = omp_get_thread_num();
+      const auto thread = omp_get_thread_num();
 
-      /*--- Center of the search ---*/
-      auto iElem_global = elem[iElem]->GetGlobalIndex();
+      /*--- Relative center of the search ---*/
+      const auto iElem = iElem_global - iElem_begin;
 
       /*--- Find the neighbours of iElem ---*/
       vector<long> neighbours;
@@ -3289,12 +3288,8 @@ void CGeometry::FilterValuesAtElementCG(const vector<su2double> &filter_radius,
         /*--- distance-based kernels (weighted averages) ---*/
         case CONSTANT_WEIGHT_FILTER: case CONICAL_WEIGHT_FILTER: case GAUSSIAN_WEIGHT_FILTER:
 
-          for (auto idx : neighbours)
-          {
-            su2double distance = 0.0;
-            for (unsigned short iDim=0; iDim<nDim; ++iDim)
-              distance += pow(cg_elem[nDim*iElem_global+iDim]-cg_elem[nDim*idx+iDim],2);
-            distance = sqrt(distance);
+          for (auto idx : neighbours) {
+            auto distance = GeometryToolbox::Distance(nDim, cg_elem[iElem_global], cg_elem[idx]);
 
             switch ( kernel_type ) {
               case CONSTANT_WEIGHT_FILTER: weight = 1.0; break;
@@ -3303,10 +3298,10 @@ void CGeometry::FilterValuesAtElementCG(const vector<su2double> &filter_radius,
               default: break;
             }
             weight *= vol_elem[idx];
-            numerator   += weight*work_values[idx];
+            numerator += weight*work_elem[idx];
             denominator += weight;
           }
-          values[iElem] = numerator/denominator;
+          work_loc[iElem] = numerator/denominator;
           break;
 
         /*--- morphology kernels (image processing) ---*/
@@ -3315,130 +3310,193 @@ void CGeometry::FilterValuesAtElementCG(const vector<su2double> &filter_radius,
           for (auto idx : neighbours)
           {
             switch ( kernel_type ) {
-              case DILATE_MORPH_FILTER: numerator += exp(kernel_param*work_values[idx]); break;
-              case ERODE_MORPH_FILTER:  numerator += exp(kernel_param*(1.0-work_values[idx])); break;
+              case DILATE_MORPH_FILTER: numerator += exp(kernel_param*work_elem[idx]); break;
+              case ERODE_MORPH_FILTER: numerator += exp(kernel_param*(1.0-work_elem[idx])); break;
               default: break;
             }
             denominator += 1.0;
           }
-          values[iElem] = log(numerator/denominator)/kernel_param;
-          if ( kernel_type==ERODE_MORPH_FILTER ) values[iElem] = 1.0-values[iElem];
+          work_loc[iElem] = log(numerator/denominator)/kernel_param;
+          if ( kernel_type==ERODE_MORPH_FILTER ) work_loc[iElem] = 1.0-work_loc[iElem];
           break;
 
         default:
           SU2_MPI::Error("Unknown type of filter kernel",CURRENT_FUNCTION);
       }
     }
-  }
 
-  } // end OpenMP parallel section
+    /*--- Gather result on master rank. ---*/
+    SU2_OMP_MASTER {
+      if (rank != MASTER_NODE) {
+        /*--- Send to master. ---*/
+        SU2_MPI::Send(work_loc.data(), work_loc.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
+      }
+      else {
+        for (size_t i=0; i<work_loc.size(); ++i) work_elem[i] = work_loc[i];
 
-  limited_searches /= kernels.size();
+        /*--- Receive from all other ranks. ---*/
+        for (int p=0; p<size; p+=mpi_stride) {
+          if (p == MASTER_NODE) continue;
+          const auto begin = p / mpi_stride * chunk;
+          const auto end = min(begin + chunk, Global_nElemDomain);
+          SU2_MPI::Recv(&work_elem[begin], end-begin+1, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+      }
 
-  unsigned long tmp = limited_searches;
-  SU2_MPI::Reduce(&tmp,&limited_searches,1,MPI_UNSIGNED_LONG,MPI_SUM,MASTER_NODE,MPI_COMM_WORLD);
-
-  if (rank==MASTER_NODE && limited_searches>0)
-    cout << "Warning: The filter radius was limited for " << limited_searches
-         << " elements (" << limited_searches/(0.01*Global_nElemDomain) << "%).\n";
-
-  delete [] neighbour_idx;
-  delete [] cg_elem;
-  delete [] vol_elem;
-  delete [] work_values;
-}
-
-void CGeometry::GetGlobalElementAdjacencyMatrix(vector<unsigned long> &neighbour_start,
-                                                long *&neighbour_idx) const
-{
-  if ( neighbour_idx != nullptr )
-    SU2_MPI::Error("neighbour_idx is expected to be NULL, stopping to avoid a potential memory leak",CURRENT_FUNCTION);
-
-  /*--- Determine how much space we need for the adjacency matrix by counting the
-  neighbours of each element, i.e. its number of faces---*/
-  unsigned short *nFaces_elem = new unsigned short [Global_nElemDomain];
-
-  SU2_OMP_PARALLEL
-  {
-    SU2_OMP_FOR_STAT(256)
-    for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem)
-      nFaces_elem[iElem] = 0;
-
-    SU2_OMP_FOR_STAT(256)
-    for(auto iElem=0ul; iElem<nElem; ++iElem) {
-      auto iElem_global = elem[iElem]->GetGlobalIndex();
-      nFaces_elem[iElem_global] = elem[iElem]->GetnFaces();
-    }
-  }
-#ifdef HAVE_MPI
-  /*--- Share with all processors ---*/
-  {
-    unsigned short *buffer = new unsigned short [Global_nElemDomain];
-    MPI_Allreduce(nFaces_elem,buffer,Global_nElemDomain,MPI_UNSIGNED_SHORT,MPI_MAX,MPI_COMM_WORLD);
-    /*--- swap pointers and delete old data to keep the same variable name after reduction ---*/
-    swap(buffer, nFaces_elem); delete [] buffer;
-  }
-#endif
-
-  /*--- Vector with the addresses of the start of the neighbours of a given element.
-  This is generated by a cumulative sum of the neighbour count. ---*/
-  neighbour_start.resize(Global_nElemDomain+1);
-
-  neighbour_start[0] = 0;
-  for(auto iElem=0ul; iElem<Global_nElemDomain; ++iElem) {
-    neighbour_start[iElem+1] = neighbour_start[iElem]+nFaces_elem[iElem];
-  }
-  delete [] nFaces_elem;
-
-  /*--- Allocate ---*/
-  unsigned long matrix_size = neighbour_start[Global_nElemDomain];
-  neighbour_idx = new long [matrix_size];
-
-  SU2_OMP_PARALLEL
-  {
-    /*--- Initialize ---*/
-    SU2_OMP_FOR_STAT(256)
-    for(auto iElem=0ul; iElem<matrix_size; ++iElem) neighbour_idx[iElem] = -1;
-
-    /*--- Populate ---*/
-    SU2_OMP_FOR_STAT(128)
-    for(auto iElem=0ul; iElem<nElem; ++iElem)
-    {
-      auto iElem_global = elem[iElem]->GetGlobalIndex();
-      auto start_pos = neighbour_start[iElem_global];
-
-      for(unsigned short iFace=0; iFace<elem[iElem]->GetnFaces(); ++iFace)
-      {
-        long neighbour = elem[iElem]->GetNeighbor_Elements(iFace);
-
-        if ( neighbour>=0 ) {
-          neighbour_idx[start_pos+iFace] = elem[neighbour]->GetGlobalIndex();
+      if (iKernel != kernels.size()-1) {
+        /*--- Need to bcast, but not really a bcast since only some nodes are involved. ---*/
+        if (rank == MASTER_NODE) {
+          for (int p=0; p<size; p+=mpi_stride) {
+            if (p == MASTER_NODE) continue;
+            SU2_MPI::Send(work_elem.data(), work_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+          }
+        }
+        else {
+          SU2_MPI::Recv(work_elem.data(), work_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
       }
     }
   }
-#ifdef HAVE_MPI
-  /*--- Share with all processors ---*/
-  {
-    long *buffer = new long [matrix_size];
-    MPI_Allreduce(neighbour_idx,buffer,matrix_size,MPI_LONG,MPI_MAX,MPI_COMM_WORLD);
-    swap(buffer, neighbour_idx); delete [] buffer;
+  } // end OpenMP parallel section
+  } // end rank % mpi_stride == 0
+
+  /*--- Master has all values, order needs to be undone before scattering. ---*/
+
+  if (rank == MASTER_NODE) {
+    int nElem_max = 0;
+    for (auto& x : counts) {
+      x /= nDim;
+      nElem_max = max(nElem_max, x);
+    }
+    vector<su2double> work_loc(nElem_max);
+
+    for (unsigned long i = 0; i < nElem; ++i)
+      values[i] = work_elem[global_index[i]];
+
+    for (int p=0, cursor=nElem; p<size; ++p) {
+      if (p == MASTER_NODE) continue;
+      for (int i = 0; i < counts[p]; ++i)
+        work_loc[i] = work_elem[global_index[cursor++]];
+      SU2_MPI::Send(work_loc.data(), counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+    }
   }
-#endif
+  else {
+    SU2_MPI::Recv(values, nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+
+  limited_searches /= kernels.size();
+
+  unsigned long t = limited_searches;
+  SU2_MPI::Reduce(&t,&limited_searches,1,MPI_UNSIGNED_LONG,MPI_SUM,MASTER_NODE,MPI_COMM_WORLD);
+
+  if (rank==MASTER_NODE && limited_searches>0)
+    cout << "Warning: The filter radius was limited for " << limited_searches
+         << " elements (" << limited_searches/(0.01*Global_nElemDomain) << "%).\n";
+}
+
+void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
+                                                vector<unsigned long> &global_index,
+                                                vector<unsigned long> &neighbour_start,
+                                                vector<long> &neighbour_idx) const
+{
+  if (size % mpi_stride)
+    SU2_MPI::Error("MPI stride must be a divisor of the number of ranks.", CURRENT_FUNCTION);
+
+  vector<unsigned short> nFaces(nElem);
+  vector<unsigned long> glblIndex(nElem);
+  vector<long> connect;
+
+  for(auto iElem=0ul; iElem<nElem; ++iElem) {
+    glblIndex[iElem] = elem[iElem]->GetGlobalIndex();
+    nFaces[iElem] = elem[iElem]->GetnFaces();
+    for(unsigned short iFace=0; iFace<nFaces[iElem]; ++iFace) {
+      long neighbour = elem[iElem]->GetNeighbor_Elements(iFace);
+      if ( neighbour>=0 ) neighbour = elem[neighbour]->GetGlobalIndex();
+      connect.push_back(neighbour);
+    }
+  }
+
+  unsigned long nElemGlobal = 0, nE = nElem;
+  SU2_MPI::Allreduce(&nE, &nElemGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+
+  vector<unsigned short> nFaces_elem(nElemGlobal * (rank==MASTER_NODE));
+  global_index.resize(nElemGlobal * (rank==MASTER_NODE));
+
+  vector<int> counts(size), displs(size);
+  int tmp = nElem;
+  MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+  displs[0] = 0;
+  for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
+
+  SU2_MPI::Gatherv(nFaces.data(), nElem, MPI_UNSIGNED_SHORT, nFaces_elem.data(), counts.data(),
+                   displs.data(), MPI_UNSIGNED_SHORT, MASTER_NODE, MPI_COMM_WORLD);
+  SU2_MPI::Gatherv(glblIndex.data(), nElem, MPI_UNSIGNED_LONG, global_index.data(), counts.data(),
+                   displs.data(), MPI_UNSIGNED_LONG, MASTER_NODE, MPI_COMM_WORLD);
+
+  tmp = connect.size();
+  MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+  for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
+
+  vector<long> connectivity((displs.back()+counts.back()) * (rank==MASTER_NODE));
+
+  SU2_MPI::Gatherv(connect.data(), tmp, MPI_LONG, connectivity.data(), counts.data(),
+                   displs.data(), MPI_LONG, MASTER_NODE, MPI_COMM_WORLD);
+
+  if (rank == MASTER_NODE) {
+    neighbour_start.resize(Global_nElemDomain+1);
+
+    for (unsigned long iElem = 0; iElem < nElemGlobal; ++iElem) {
+      neighbour_start[global_index[iElem]] = nFaces_elem[iElem];
+    }
+
+    auto carry = neighbour_start.front();
+    neighbour_start[0] = 0;
+    for (unsigned long iElem = 1; iElem <= Global_nElemDomain; ++iElem) {
+      swap(carry, neighbour_start[iElem]);
+      neighbour_start[iElem] += neighbour_start[iElem-1];
+    }
+
+    neighbour_idx.resize(neighbour_start.back());
+    for (auto& x : neighbour_idx) x = -1;
+
+    for (unsigned long i = 0, cursor = 0; i < nElemGlobal; ++i) {
+      auto nFace = nFaces_elem[i];
+      auto iElem = global_index[i];
+
+      auto start = neighbour_start[iElem];
+
+      for (unsigned short iFace = 0; iFace < nFace; ++iFace) {
+        neighbour_idx[start+iFace] = max(neighbour_idx[start+iFace], connectivity[cursor++]);
+      }
+    }
+
+    for (int p=0; p<size; p+=mpi_stride) {
+      if (p == MASTER_NODE) continue;
+      SU2_MPI::Send(neighbour_start.data(), Global_nElemDomain+1, MPI_UNSIGNED_LONG, p, 0, MPI_COMM_WORLD);
+      SU2_MPI::Send(neighbour_idx.data(), neighbour_start.back(), MPI_LONG, p, 0, MPI_COMM_WORLD);
+    }
+  }
+  else if (rank % mpi_stride == 0) {
+    neighbour_start.resize(Global_nElemDomain+1);
+    SU2_MPI::Recv(neighbour_start.data(), Global_nElemDomain+1, MPI_UNSIGNED_LONG, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    neighbour_idx.resize(neighbour_start.back());
+    SU2_MPI::Recv(neighbour_idx.data(), neighbour_start.back(), MPI_LONG, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
 }
 
 bool CGeometry::GetRadialNeighbourhood(const unsigned long iElem_global,
-                                       const passivedouble radius,
+                                       passivedouble radius,
                                        size_t search_limit,
                                        const vector<unsigned long> &neighbour_start,
-                                       const long *neighbour_idx,
-                                       const su2double *cg_elem,
+                                       const vector<long> &neighbour_idx,
+                                       const su2activematrix &cg_elem,
                                        vector<long> &neighbours,
                                        vector<bool> &is_neighbor) const
 {
+  const bool wasActive = AD::BeginPassive();
+
   /*--- Validate inputs if we are debugging. ---*/
   assert(neighbour_start.size() == Global_nElemDomain+1 &&
-         neighbour_idx != nullptr && cg_elem != nullptr &&
          is_neighbor.size() == Global_nElemDomain && "invalid inputs");
 
   /*--- 0 search_limit means "unlimited" (it will probably
@@ -3450,9 +3508,8 @@ bool CGeometry::GetRadialNeighbourhood(const unsigned long iElem_global,
   neighbours.push_back(iElem_global);
   is_neighbor[iElem_global] = true;
 
-  passivedouble X0[3] = {0.0, 0.0, 0.0};
-  for (unsigned short iDim=0; iDim<nDim; ++iDim)
-    X0[iDim] = SU2_TYPE::GetValue(cg_elem[nDim*iElem_global+iDim]);
+  radius = pow(radius,2);
+  auto X0 = cg_elem[iElem_global];
 
   /*--- Loop stops when "neighbours" stops changing size, or degree reaches limit. ---*/
   bool finished = false;
@@ -3478,14 +3535,8 @@ bool CGeometry::GetRadialNeighbourhood(const unsigned long iElem_global,
 
     /*--- Add candidates within "radius" of X0, if none qualifies we are "finished". ---*/
     finished = true;
-    for (auto idx : candidates)
-    {
-      /*--- passivedouble as we only need to compare "distance". ---*/
-      passivedouble distance = 0.0;
-      for (unsigned short iDim=0; iDim<nDim; ++iDim)
-        distance += pow(X0[iDim]-SU2_TYPE::GetValue(cg_elem[nDim*idx+iDim]),2);
-
-      if(distance < pow(radius,2)) {
+    for (auto idx : candidates) {
+      if (GeometryToolbox::SquaredDistance(nDim, X0, cg_elem[idx]) < radius) {
         neighbours.push_back(idx);
         finished = false;
       }
@@ -3496,6 +3547,8 @@ bool CGeometry::GetRadialNeighbourhood(const unsigned long iElem_global,
   /*--- Restore the state of the working vector for next call. ---*/
   for(auto idx : neighbours) is_neighbor[idx] = false;
 
+  AD::EndPassive(wasActive);
+
   return finished;
 }
 
@@ -3504,7 +3557,7 @@ void CGeometry::SetElemVolume(CConfig *config)
   SU2_OMP_PARALLEL
   {
   /*--- Create a bank of elements to avoid instantiating inside loop. ---*/
-  CElement *elements[4] = {nullptr, nullptr, nullptr, nullptr};
+  array<CElement*,4> elements{{nullptr,nullptr,nullptr,nullptr}};
 
   if (nDim==2) {
     elements[0] = new CTRIA1();
@@ -3545,12 +3598,7 @@ void CGeometry::SetElemVolume(CConfig *config)
     else        elem[iElem]->SetVolume(element->ComputeVolume());
   }
 
-  delete elements[0];
-  delete elements[1];
-  if (nDim==3) {
-    delete elements[2];
-    delete elements[3];
-  }
+  for (auto e : elements) delete e;
 
   } // end SU2_OMP_PARALLEL
 }

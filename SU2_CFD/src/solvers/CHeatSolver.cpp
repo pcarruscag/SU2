@@ -770,20 +770,65 @@ void CHeatSolver::Set_Heatflux_Areas(CGeometry *geometry, CConfig *config) {
 void CHeatSolver::BC_Isothermal_Wall(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics, CConfig *config,
                                        unsigned short val_marker) {
 
-  const bool implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
-  const auto Marker_Tag = config->GetMarker_All_TagBound(val_marker);
-  const su2double Twall = config->GetIsothermal_Temperature(Marker_Tag)/config->GetTemperature_Ref();
+  unsigned long iPoint, iVertex, Point_Normal;
+  unsigned short iDim;
+  su2double *Normal, *Coord_i, *Coord_j, Area, dist_ij, laminar_viscosity, thermal_diffusivity, Twall, dTdn, Prandtl_Lam;
+  //su2double Prandtl_Turb;
+  bool implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
-  for (auto iVertex = 0u; iVertex < geometry->nVertex[val_marker]; iVertex++) {
-    const auto iPoint = geometry->vertex[val_marker][iVertex]->GetNode();
+  bool flow = ((config->GetKind_Solver() == INC_NAVIER_STOKES)
+               || (config->GetKind_Solver() == INC_RANS)
+               || (config->GetKind_Solver() == DISC_ADJ_INC_NAVIER_STOKES)
+               || (config->GetKind_Solver() == DISC_ADJ_INC_RANS));
 
-    if (!geometry->nodes->GetDomain(iPoint)) continue;
+  Prandtl_Lam = config->GetPrandtl_Lam();
+//  Prandtl_Turb = config->GetPrandtl_Turb();
+  laminar_viscosity = config->GetMu_ConstantND();
+  //Prandtl_Turb = config->GetPrandtl_Turb();
+  //laminar_viscosity = config->GetViscosity_FreeStreamND(); // TDE check for consistency for CHT
 
-    nodes->SetSolution_Old(iPoint,&Twall);
-    LinSysRes(iPoint, 0) = 0.0;
-    nodes->SetRes_TruncErrorZero(iPoint);
+  string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
 
-    if (implicit) Jacobian.DeleteValsRowi(iPoint);
+  Twall = config->GetIsothermal_Temperature(Marker_Tag)/config->GetTemperature_Ref();
+
+  for (iVertex = 0; iVertex < geometry->nVertex[val_marker]; iVertex++) {
+
+    iPoint = geometry->vertex[val_marker][iVertex]->GetNode();
+
+    if (geometry->nodes->GetDomain(iPoint)) {
+
+        Point_Normal = geometry->vertex[val_marker][iVertex]->GetNormal_Neighbor();
+
+        Normal = geometry->vertex[val_marker][iVertex]->GetNormal();
+        Area = 0.0;
+        for (iDim = 0; iDim < nDim; iDim++) Area += Normal[iDim]*Normal[iDim];
+        Area = sqrt (Area);
+
+        Coord_i = geometry->nodes->GetCoord(iPoint);
+        Coord_j = geometry->nodes->GetCoord(Point_Normal);
+        dist_ij = 0;
+        for (iDim = 0; iDim < nDim; iDim++)
+          dist_ij += (Coord_j[iDim]-Coord_i[iDim])*(Coord_j[iDim]-Coord_i[iDim]);
+        dist_ij = sqrt(dist_ij);
+
+        dTdn = -(nodes->GetSolution(Point_Normal,0) - Twall)/dist_ij;
+
+        if(flow) {
+          thermal_diffusivity = laminar_viscosity/Prandtl_Lam;
+        }
+        else
+          thermal_diffusivity = config->GetThermalDiffusivity_Solid();
+
+        Res_Visc[0] = thermal_diffusivity*dTdn*Area;
+
+        if(implicit) {
+
+          Jacobian_i[0][0] = -thermal_diffusivity/dist_ij * Area;
+        }
+
+        LinSysRes.SubtractBlock(iPoint, Res_Visc);
+        Jacobian.SubtractBlock2Diag(iPoint, Jacobian_i);
+    }
   }
 }
 
@@ -1030,8 +1075,8 @@ void CHeatSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
 
 void CHeatSolver::BC_ConjugateHeat_Interface(CGeometry *geometry, CSolver **solver_container, CNumerics *numerics, CConfig *config, unsigned short val_marker) {
 
-  unsigned long iVertex, iPoint, total_index;
-  unsigned short iDim, iVar;
+  unsigned long iVertex, iPoint;
+  unsigned short iDim;
 
   su2double thermal_diffusivity, rho_cp_solid, Temperature_Ref, T_Conjugate, Tinterface,
       Tnormal_Conjugate, HeatFluxDensity, HeatFlux, Area;
@@ -1066,12 +1111,7 @@ void CHeatSolver::BC_ConjugateHeat_Interface(CGeometry *geometry, CSolver **solv
         LinSysRes(iPoint, 0) = 0.0;
         nodes->SetRes_TruncErrorZero(iPoint);
 
-        if (implicit) {
-          for (iVar = 0; iVar < nVar; iVar++) {
-            total_index = iPoint*nVar+iVar;
-            Jacobian.DeleteValsRowi(total_index);
-          }
-        }
+        if (implicit) Jacobian.DeleteValsRowi(iPoint);
       }
     }
   }
