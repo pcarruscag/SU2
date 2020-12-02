@@ -3149,56 +3149,62 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
   active processor, this is required because the filter reaches far into adjacent partitions. ---*/
 
   /*--- Adjacency matrix ---*/
-  vector<unsigned long> global_index;
-  vector<unsigned long> neighbour_start;
+  vector<unsigned long> global_index, neighbour_start;
   vector<long> neighbour_idx;
   GetGlobalElementAdjacencyMatrix(mpi_stride, global_index, neighbour_start, neighbour_idx);
 
+  vector<unsigned long> counts(size), displs(size,0);
+  auto nE = nElem;
+  SU2_MPI::Allgather(&nE, 1, MPI_UNSIGNED_LONG, counts.data(), 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+  for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
+  const auto nElemGlobal = displs.back() + counts.back();
+
   /*--- Element centroids and volumes. ---*/
-  su2activematrix cg_loc(nElem,nDim), cg_elem;
-  vector<su2double> vol_loc(nElem), vol_elem, work_elem;
+  su2activematrix cg_elem;
+  vector<su2double> vol_elem, work_elem;
 
-  /*--- Populate ---*/
-  SU2_OMP_PARALLEL_(for schedule(static,256))
-  for(auto iElem=0ul; iElem<nElem; ++iElem) {
-    for(unsigned short iDim=0; iDim<nDim; ++iDim)
-      cg_loc(iElem,iDim) = elem[iElem]->GetCG(iDim);
-    vol_loc[iElem] = elem[iElem]->GetVolume();
-  }
-
-  unsigned long nElemGlobal = 0, nE = nElem;
-  SU2_MPI::Allreduce(&nE, &nElemGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
-
+  /*--- Gatherv by hand to avoid AD problems. ---*/
   if (rank == MASTER_NODE) {
     cg_elem.resize(nElemGlobal,nDim);
     vol_elem.resize(nElemGlobal);
     work_elem.resize(nElemGlobal);
+
+    SU2_OMP_PARALLEL_(for schedule(static,256))
+    for(auto iElem=0ul; iElem<nElem; ++iElem) {
+      for(unsigned short iDim=0; iDim<nDim; ++iDim)
+        cg_elem(iElem+displs[rank],iDim) = elem[iElem]->GetCG(iDim);
+      vol_elem[iElem+displs[rank]] = elem[iElem]->GetVolume();
+      work_elem[iElem+displs[rank]] = values[iElem];
+    }
+
+    for (int p=0; p<size; ++p) {
+      if (p == MASTER_NODE) continue;
+      SU2_MPI::Recv(cg_elem[displs[p]], counts[p]*nDim, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      SU2_MPI::Recv(&vol_elem[displs[p]], counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      SU2_MPI::Recv(&work_elem[displs[p]], counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+  }
+  else {
+    cg_elem.resize(nElem,nDim);
+    vol_elem.resize(nElem);
+
+    SU2_OMP_PARALLEL_(for schedule(static,256))
+    for(auto iElem=0ul; iElem<nElem; ++iElem) {
+      for(unsigned short iDim=0; iDim<nDim; ++iDim)
+        cg_elem(iElem,iDim) = elem[iElem]->GetCG(iDim);
+      vol_elem[iElem] = elem[iElem]->GetVolume();
+    }
+
+    SU2_MPI::Send(cg_elem.data(), nElem*nDim, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
+    SU2_MPI::Send(vol_elem.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
+    SU2_MPI::Send(values, nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
   }
 
-  vector<int> counts(size), displs(size);
-  int tmp = nElem;
-  SU2_MPI::Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-  displs[0] = 0;
-  for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
-
-  SU2_MPI::Gatherv(vol_loc.data(), nElem, MPI_DOUBLE, vol_elem.data(), counts.data(),
-                   displs.data(), MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
-
-  SU2_MPI::Gatherv(values, nElem, MPI_DOUBLE, work_elem.data(), counts.data(),
-                   displs.data(), MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
-
-  for (auto& x : counts) x *= nDim;
-  for (auto& x : displs) x *= nDim;
-
-  SU2_MPI::Gatherv(cg_loc.data(), nElem*nDim, MPI_DOUBLE, cg_elem.data(), counts.data(),
-                   displs.data(), MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
-
+  /*--- Master node re-orders data by global index and sends it to other active nodes. ---*/
   if (rank == MASTER_NODE) {
-    /*--- Master node re-orders data by global index and sends it to other active nodes. ---*/
-
-    swap(cg_loc, cg_elem);
-    swap(vol_loc, vol_elem);
-    auto work_loc = move(work_elem);
+    const auto cg_tmp = cg_elem;
+    const auto vol_tmp = vol_elem;
+    const auto work_tmp = work_elem;
 
     cg_elem.resize(Global_nElemDomain,nDim);
     vol_elem.resize(Global_nElemDomain);
@@ -3208,9 +3214,9 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
     for (unsigned long i = 0; i < nElemGlobal; ++i) {
       auto iElem = global_index[i];
       for(unsigned short iDim=0; iDim<nDim; ++iDim)
-        cg_elem(iElem,iDim) = cg_loc(i,iDim);
-      vol_elem[iElem] = vol_loc[i];
-      work_elem[iElem] = work_loc[i];
+        cg_elem(iElem,iDim) = cg_tmp(i,iDim);
+      vol_elem[iElem] = vol_tmp[i];
+      work_elem[iElem] = work_tmp[i];
     }
 
     for (int p=0; p<size; p+=mpi_stride) {
@@ -3221,8 +3227,6 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
     }
   }
   else if (rank % mpi_stride == 0) {
-    /*--- Other active nodes receive ordered data from master. ---*/
-
     cg_elem.resize(Global_nElemDomain,nDim);
     vol_elem.resize(Global_nElemDomain);
     work_elem.resize(Global_nElemDomain);
@@ -3325,14 +3329,15 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
       }
     }
 
-    /*--- Gather result on master rank. ---*/
     SU2_OMP_MASTER {
+      /*--- Gather result on master rank. ---*/
       if (rank != MASTER_NODE) {
         /*--- Send to master. ---*/
         SU2_MPI::Send(work_loc.data(), work_loc.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
       }
       else {
-        for (size_t i=0; i<work_loc.size(); ++i) work_elem[i] = work_loc[i];
+        for (size_t i=0, begin=rank/mpi_stride*chunk; i<work_loc.size(); ++i)
+          work_elem[begin+i] = work_loc[i];
 
         /*--- Receive from all other ranks. ---*/
         for (int p=0; p<size; p+=mpi_stride) {
@@ -3343,8 +3348,8 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
         }
       }
 
+      /*--- Need to bcast, but not really a bcast since only some nodes are involved. ---*/
       if (iKernel != kernels.size()-1) {
-        /*--- Need to bcast, but not really a bcast since only some nodes are involved. ---*/
         if (rank == MASTER_NODE) {
           for (int p=0; p<size; p+=mpi_stride) {
             if (p == MASTER_NODE) continue;
@@ -3363,20 +3368,15 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
   /*--- Master has all values, order needs to be undone before scattering. ---*/
 
   if (rank == MASTER_NODE) {
-    int nElem_max = 0;
-    for (auto& x : counts) {
-      x /= nDim;
-      nElem_max = max(nElem_max, x);
-    }
-    vector<su2double> work_loc(nElem_max);
+    vector<su2double> work_loc(*max_element(counts.begin(), counts.end()));
 
     for (unsigned long i = 0; i < nElem; ++i)
-      values[i] = work_elem[global_index[i]];
+      values[i] = work_elem[global_index[displs[rank]+i]];
 
-    for (int p=0, cursor=nElem; p<size; ++p) {
+    for (int p=0; p<size; ++p) {
       if (p == MASTER_NODE) continue;
       for (int i = 0; i < counts[p]; ++i)
-        work_loc[i] = work_elem[global_index[cursor++]];
+        work_loc[i] = work_elem[global_index[displs[p]+i]];
       SU2_MPI::Send(work_loc.data(), counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
     }
   }
@@ -3402,6 +3402,9 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
   if (size % mpi_stride)
     SU2_MPI::Error("MPI stride must be a divisor of the number of ranks.", CURRENT_FUNCTION);
 
+  if (MASTER_NODE % mpi_stride)
+    SU2_MPI::Error("MASTER_NODE must be one of the active ranks.", CURRENT_FUNCTION);
+
   vector<unsigned short> nFaces(nElem);
   vector<unsigned long> glblIndex(nElem);
   vector<long> connect;
@@ -3422,16 +3425,16 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
   vector<unsigned short> nFaces_elem(nElemGlobal * (rank==MASTER_NODE));
   global_index.resize(nElemGlobal * (rank==MASTER_NODE));
 
-  vector<int> counts(size), displs(size);
+#ifdef HAVE_MPI
+  vector<int> counts(size), displs(size,0);
   int tmp = nElem;
   MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-  displs[0] = 0;
   for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
 
-  SU2_MPI::Gatherv(nFaces.data(), nElem, MPI_UNSIGNED_SHORT, nFaces_elem.data(), counts.data(),
-                   displs.data(), MPI_UNSIGNED_SHORT, MASTER_NODE, MPI_COMM_WORLD);
-  SU2_MPI::Gatherv(glblIndex.data(), nElem, MPI_UNSIGNED_LONG, global_index.data(), counts.data(),
-                   displs.data(), MPI_UNSIGNED_LONG, MASTER_NODE, MPI_COMM_WORLD);
+  MPI_Gatherv(nFaces.data(), nElem, MPI_UNSIGNED_SHORT, nFaces_elem.data(), counts.data(),
+              displs.data(), MPI_UNSIGNED_SHORT, MASTER_NODE, MPI_COMM_WORLD);
+  MPI_Gatherv(glblIndex.data(), nElem, MPI_UNSIGNED_LONG, global_index.data(), counts.data(),
+              displs.data(), MPI_UNSIGNED_LONG, MASTER_NODE, MPI_COMM_WORLD);
 
   tmp = connect.size();
   MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
@@ -3439,16 +3442,23 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
 
   vector<long> connectivity((displs.back()+counts.back()) * (rank==MASTER_NODE));
 
-  SU2_MPI::Gatherv(connect.data(), tmp, MPI_LONG, connectivity.data(), counts.data(),
-                   displs.data(), MPI_LONG, MASTER_NODE, MPI_COMM_WORLD);
+  MPI_Gatherv(connect.data(), tmp, MPI_LONG, connectivity.data(), counts.data(),
+              displs.data(), MPI_LONG, MASTER_NODE, MPI_COMM_WORLD);
+#else
+  nFaces_elem = move(nFaces);
+  global_index = move(glblIndex);
+  connectivity = move(connect);
+#endif
 
   if (rank == MASTER_NODE) {
     neighbour_start.resize(Global_nElemDomain+1);
 
+    /*--- Copy number of faces. ---*/
     for (unsigned long iElem = 0; iElem < nElemGlobal; ++iElem) {
       neighbour_start[global_index[iElem]] = nFaces_elem[iElem];
     }
 
+    /*--- Transform counts to offsets. ---*/
     auto carry = neighbour_start.front();
     neighbour_start[0] = 0;
     for (unsigned long iElem = 1; iElem <= Global_nElemDomain; ++iElem) {
@@ -3456,15 +3466,16 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
       neighbour_start[iElem] += neighbour_start[iElem-1];
     }
 
+    /*--- Init matrix. ---*/
     neighbour_idx.resize(neighbour_start.back());
     for (auto& x : neighbour_idx) x = -1;
 
     for (unsigned long i = 0, cursor = 0; i < nElemGlobal; ++i) {
       auto nFace = nFaces_elem[i];
       auto iElem = global_index[i];
-
       auto start = neighbour_start[iElem];
 
+      /*--- Using "max" accounts for halo element whose neighbor info is spread across ranks. ---*/
       for (unsigned short iFace = 0; iFace < nFace; ++iFace) {
         neighbour_idx[start+iFace] = max(neighbour_idx[start+iFace], connectivity[cursor++]);
       }
