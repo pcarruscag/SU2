@@ -3133,7 +3133,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
                                         const vector<su2double> &filter_radius,
                                         const vector<pair<unsigned short,su2double> > &kernels,
                                         const unsigned short search_limit,
-                                        su2double *values) const
+                                        su2activevector& values) const
 {
   /*--- Apply a filter to "input_values". The filter is an averaging process over the neighbourhood
   of each element, which is a circle in 2D and a sphere in 3D of radius "filter_radius".
@@ -3197,7 +3197,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
 
     SU2_MPI::Send(cg_elem.data(), nElem*nDim, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
     SU2_MPI::Send(vol_elem.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
-    SU2_MPI::Send(values, nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
+    SU2_MPI::Send(values.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
   }
 
   /*--- Master node re-orders data by global index and sends it to other active nodes. ---*/
@@ -3381,7 +3381,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
     }
   }
   else {
-    SU2_MPI::Recv(values, nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(values.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 
   limited_searches /= kernels.size();

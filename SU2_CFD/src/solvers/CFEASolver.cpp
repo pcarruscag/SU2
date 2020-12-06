@@ -3441,7 +3441,7 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
   search_lim = config->GetTopology_Search_Limit();
   config->GetTopology_Optim_Projection(type,param);
 
-  su2double *physical_rho = new su2double [nElement];
+  su2activevector physical_rho(nElement);
 
   /*--- "Rectify" the input, initialize the physical density with
   the design density (the filter function works in-place). ---*/
@@ -3497,8 +3497,6 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
       nodes->SetAuxVar(iPoint, sum/vol);
     }
   }
-
-  delete [] physical_rho;
 
   /*--- For when this method is called directly, e.g. by the adjoint solver. ---*/
   topol_filter_applied = true;
