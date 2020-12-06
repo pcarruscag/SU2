@@ -1576,7 +1576,7 @@ public:
    */
   void FilterValuesAtElementCG(const unsigned short mpi_stride, const vector<su2double> &filter_radius,
                                const vector<pair<unsigned short,su2double> > &kernels,
-                               const unsigned short search_limit, su2double *values) const;
+                               const unsigned short search_limit, su2activevector& values) const;
 
   /*!
    * \brief Build the global (entire mesh!) adjacency matrix for the elements in compressed format.
