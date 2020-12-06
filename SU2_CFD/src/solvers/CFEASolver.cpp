@@ -466,17 +466,16 @@ void CFEASolver::Set_ElementProperties(CGeometry *geometry, CConfig *config) {
     for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
       if (geometry->nodes->GetPhysicalBoundary(iPoint))
         for (auto iElem : geometry->nodes->GetElems(iPoint))
-          element_properties[iElem]->SetDesignDensity(0.2);
+          element_properties[iElem]->SetDesignDensity(0.1);
 
     geometry->SetElemVolume(config);
 
     // freeze small elements
     for (auto iElem=0ul; iElem<nElement; ++iElem) {
       if (geometry->elem[iElem]->GetVolume() < 3e-9)
-        element_properties[iElem]->SetDesignDensity(0.2);
+        element_properties[iElem]->SetDesignDensity(0.1);
     }
   }
-
 
 }
 
@@ -3428,7 +3427,7 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
   /*--- Apply a filter to the design densities of the elements to generate the
   physical densities which are the ones used to penalize their stiffness. ---*/
 
-  unsigned short type;
+  unsigned short type, search_lim;
   su2double param, radius;
 
   vector<pair<unsigned short,su2double> > kernels;
@@ -3439,6 +3438,7 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
     kernels.push_back(make_pair(type,param));
     filter_radius.push_back(radius);
   }
+  search_lim = config->GetTopology_Search_Limit();
   config->GetTopology_Optim_Projection(type,param);
 
   su2double *physical_rho = new su2double [nElement];
@@ -3453,8 +3453,7 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
     else                physical_rho[iElem] = rho;
   }
 
-  geometry->FilterValuesAtElementCG(config->GetTopology_MPI_Stride(), filter_radius,
-                                    kernels, config->GetTopology_Search_Limit(), physical_rho);
+  geometry->FilterValuesAtElementCG(config->GetTopology_MPI_Stride(), filter_radius, kernels, search_lim, physical_rho);
 
   SU2_OMP_PARALLEL
   {

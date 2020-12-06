@@ -3344,7 +3344,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
           if (p == MASTER_NODE) continue;
           const auto begin = p / mpi_stride * chunk;
           const auto end = min(begin + chunk, Global_nElemDomain);
-          SU2_MPI::Recv(&work_elem[begin], end-begin+1, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+          SU2_MPI::Recv(&work_elem[begin], end-begin, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
       }
 

@@ -9,7 +9,7 @@ project('SU2', 'c', 'cpp',
 pymod = import('python')
 python = pymod.find_installation()
 
-su2_cpp_args = ['-funroll-loops', '-ffast-math', '-march=ivybridge', '-mtune=ivybridge']
+su2_cpp_args = ['-funroll-loops', '-ffast-math', '-fno-finite-math-only', '-march=ivybridge', '-mtune=ivybridge']
 su2_deps     = [declare_dependency(include_directories: 'externals/CLI11')]
 
 default_warning_flags = []
