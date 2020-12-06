@@ -3161,7 +3161,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
 
   /*--- Element centroids and volumes. ---*/
   su2activematrix cg_elem;
-  vector<su2double> vol_elem, work_elem;
+  su2activevector vol_elem, work_elem;
 
   /*--- Gatherv by hand to avoid AD problems. ---*/
   if (rank == MASTER_NODE) {
@@ -3247,9 +3247,9 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
   const auto chunk = roundUpDiv(Global_nElemDomain, size / mpi_stride);
   const auto iElem_begin = rank / mpi_stride * chunk;
   const auto iElem_end = min(iElem_begin + chunk, Global_nElemDomain);
-  const auto nElem_work = iElem_end - iElem_begin + 1;
+  const auto nElem_work = iElem_end - iElem_begin;
 
-  vector<su2double> work_loc(nElem_work);
+  su2activevector work_loc(nElem_work);
 
   /*--- When gathering the neighborhood of each element we use a vector of booleans to indicate
   whether an element is already added to the list of neighbors (one vector per thread). ---*/
@@ -3368,7 +3368,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
   /*--- Master has all values, order needs to be undone before scattering. ---*/
 
   if (rank == MASTER_NODE) {
-    vector<su2double> work_loc(*max_element(counts.begin(), counts.end()));
+    su2activevector work_loc(*max_element(counts.begin(), counts.end()));
 
     for (unsigned long i = 0; i < nElem; ++i)
       values[i] = work_elem[global_index[displs[rank]+i]];
