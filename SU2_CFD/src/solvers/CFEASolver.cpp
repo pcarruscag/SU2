@@ -461,22 +461,6 @@ void CFEASolver::Set_ElementProperties(CGeometry *geometry, CConfig *config) {
 
   }
 
-  if (topology_mode) {
-    // make a shell
-    for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
-      if (geometry->nodes->GetPhysicalBoundary(iPoint))
-        for (auto iElem : geometry->nodes->GetElems(iPoint))
-          element_properties[iElem]->SetDesignDensity(0.1);
-
-    geometry->SetElemVolume(config);
-
-    // freeze small elements
-    for (auto iElem=0ul; iElem<nElement; ++iElem) {
-      if (geometry->elem[iElem]->GetVolume() < 3e-9)
-        element_properties[iElem]->SetDesignDensity(0.1);
-    }
-  }
-
 }
 
 void CFEASolver::Set_Prestretch(CGeometry *geometry, CConfig *config) {
@@ -3133,6 +3117,11 @@ void CFEASolver::Compute_OFVolFrac(CGeometry *geometry, const CConfig *config)
   else
     Total_OFVolFrac = integral/total_volume;
 
+  if (rank == MASTER_NODE) {
+    ofstream f; f.open("of.txt");
+    f << Total_OFVolFrac << endl;
+  }
+
   /*--- To be accessible from the output. ---*/
   Total_OFCombo = Total_OFVolFrac;
 
@@ -3424,6 +3413,18 @@ void CFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *config)
 
 void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *config)
 {
+    // make a shell
+    for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
+      if (geometry->nodes->GetPhysicalBoundary(iPoint))
+        for (auto iElem : geometry->nodes->GetElems(iPoint))
+          element_properties[iElem]->SetDesignDensity(0.562);
+
+    // freeze small elements
+    for (auto iElem=0ul; iElem<nElement; ++iElem) {
+      if (geometry->elem[iElem]->GetVolume() < 2e-9)
+        element_properties[iElem]->SetDesignDensity(0.562);
+    }
+
   /*--- Apply a filter to the design densities of the elements to generate the
   physical densities which are the ones used to penalize their stiffness. ---*/
 
