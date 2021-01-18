@@ -3415,14 +3415,15 @@ void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *conf
 {
     // make a shell
     for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
-      if (geometry->nodes->GetPhysicalBoundary(iPoint))
+      if (geometry->nodes->GetPhysicalBoundary(iPoint) &&
+          geometry->nodes->GetCoord(iPoint,1) > 0.001)
         for (auto iElem : geometry->nodes->GetElems(iPoint))
-          element_properties[iElem]->SetDesignDensity(0.562);
+          element_properties[iElem]->SetDesignDensity(0.4642);
 
     // freeze small elements
     for (auto iElem=0ul; iElem<nElement; ++iElem) {
-      if (geometry->elem[iElem]->GetVolume() < 2e-9)
-        element_properties[iElem]->SetDesignDensity(0.562);
+      if (geometry->elem[iElem]->GetVolume() < 1.5e-9)
+        element_properties[iElem]->SetDesignDensity(0.4642);
     }
 
   /*--- Apply a filter to the design densities of the elements to generate the
