@@ -2,7 +2,7 @@
  * \file CFEM_DG_EulerSolver.cpp
  * \brief Main subroutines for solving finite element Euler flow problems
  * \author J. Alonso, E. van der Weide, T. Economon
- * \version 7.0.7 "Blackbird"
+ * \version 7.1.0 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
@@ -6699,7 +6699,7 @@ void CFEM_DG_EulerSolver::MultiplyResidualByInverseMassMatrix(
 
       /* Multiply the residual with the inverse of the mass matrix.
          Use the array workArray as temporary storage. */
-      for(unsigned long mm=0; mm<nVar*volElem[l].nDOFsSol; ++mm)
+      for(unsigned short mm=0; mm<nVar*volElem[l].nDOFsSol; ++mm)
         workArray[mm] = res[mm];
 
       blasFunctions->gemm(volElem[l].nDOFsSol, nVar, volElem[l].nDOFsSol,
@@ -7323,7 +7323,7 @@ void CFEM_DG_EulerSolver::ComputeVerificationError(CGeometry *geometry,
    RMS (L2) and maximum (Linf) global error norms. From these
    global measures, one can compute the order of accuracy. ---*/
 
-  bool write_heads = ((((config->GetTimeIter() % (config->GetWrt_Con_Freq()*40)) == 0)
+  bool write_heads = ((((config->GetTimeIter() % (config->GetScreen_Wrt_Freq(2)*40)) == 0)
                        && (config->GetTimeIter()!= 0))
                       || (config->GetTimeIter() == 1));
   if( !write_heads ) return;
@@ -7721,7 +7721,7 @@ void CFEM_DG_EulerSolver::BoundaryStates_Riemann(CConfig                  *confi
          pressure and temperature as well as the flow direction. */
       su2double P_Total   = config->GetRiemann_Var1(Marker_Tag);
       su2double T_Total   = config->GetRiemann_Var2(Marker_Tag);
-      su2double *Flow_Dir = config->GetRiemann_FlowDir(Marker_Tag);
+      auto Flow_Dir = config->GetRiemann_FlowDir(Marker_Tag);
 
       P_Total /= config->GetPressure_Ref();
       T_Total /= config->GetTemperature_Ref();
@@ -7782,7 +7782,7 @@ void CFEM_DG_EulerSolver::BoundaryStates_Riemann(CConfig                  *confi
          temperature as well as the three components of the Mach number. */
       su2double P_static = config->GetRiemann_Var1(Marker_Tag);
       su2double T_static = config->GetRiemann_Var2(Marker_Tag);
-      su2double *Mach    = config->GetRiemann_FlowDir(Marker_Tag);
+      auto Mach = config->GetRiemann_FlowDir(Marker_Tag);
 
       P_static /= config->GetPressure_Ref();
       T_static /= config->GetTemperature_Ref();
@@ -7833,7 +7833,7 @@ void CFEM_DG_EulerSolver::BoundaryStates_Riemann(CConfig                  *confi
          temperature as well as the three components of the Mach number. */
       su2double P_static   = config->GetRiemann_Var1(Marker_Tag);
       su2double Rho_static = config->GetRiemann_Var2(Marker_Tag);
-      su2double *Mach      = config->GetRiemann_FlowDir(Marker_Tag);
+      auto Mach            = config->GetRiemann_FlowDir(Marker_Tag);
 
       P_static /= config->GetPressure_Ref();
       Rho_static /= config->GetDensity_Ref();
@@ -7883,7 +7883,7 @@ void CFEM_DG_EulerSolver::BoundaryStates_Riemann(CConfig                  *confi
          flow direction. Retrieve the non-dimensional data. */
       su2double Density_e = config->GetRiemann_Var1(Marker_Tag);
       su2double VelMag_e  = config->GetRiemann_Var2(Marker_Tag);
-      su2double *Flow_Dir = config->GetRiemann_FlowDir(Marker_Tag);
+      auto Flow_Dir       = config->GetRiemann_FlowDir(Marker_Tag);
 
       Density_e /= config->GetDensity_Ref();
       VelMag_e  /= config->GetVelocity_Ref();
