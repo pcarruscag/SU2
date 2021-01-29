@@ -66,7 +66,7 @@ inline T* aligned_alloc(size_t alignment, size_t size) noexcept
 
   size = round_up(alignment, size);
 
-  //void* ptr = nullptr;
+  void* ptr = nullptr;
 
 #if defined(__APPLE__)
   if(::posix_memalign(&ptr, alignment, size) != 0)
@@ -76,10 +76,9 @@ inline T* aligned_alloc(size_t alignment, size_t size) noexcept
 #elif defined(_WIN32)
   ptr = _aligned_malloc(size, alignment);
 #else
-  //ptr = ::aligned_alloc(alignment, size);
+  ptr = ::aligned_alloc(alignment, size);
 #endif
-  //return static_cast<T*>(ptr);
-  return new T[size/sizeof(T)];
+  return static_cast<T*>(ptr);
 }
 
 /*!
@@ -92,9 +91,8 @@ inline void aligned_free(T* ptr) noexcept
 #if defined(_WIN32)
   _aligned_free(ptr);
 #else
-  //free(ptr);
+  free(ptr);
 #endif
-  delete [] ptr;
 }
 
 } // namespace
