@@ -9,7 +9,7 @@ project('SU2', 'c', 'cpp',
 pymod = import('python')
 python = pymod.find_installation()
 
-su2_cpp_args = ['-funroll-loops', '-ffast-math', '-fno-finite-math-only', '-march=ivybridge', '-mtune=ivybridge']
+su2_cpp_args = ['-funroll-loops', '-ffast-math', '-fno-finite-math-only', '-march=znver2', '-mtune=znver2']
 su2_deps     = [declare_dependency(include_directories: 'externals/CLI11')]
 
 default_warning_flags = []
@@ -151,8 +151,8 @@ elif get_option('enable-openblas')
 
   su2_cpp_args += '-DHAVE_BLAS'
   su2_cpp_args += '-DHAVE_LAPACK'
-  blas_dep = dependency(get_option('blas-name'))
-  su2_deps += blas_dep
+#  blas_dep = dependency(get_option('blas-name'))
+#  su2_deps += blas_dep
 
 endif
 

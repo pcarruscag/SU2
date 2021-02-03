@@ -3324,16 +3324,16 @@ void CFEASolver::ExtractAdjoint_Variables(CGeometry *geometry, CConfig *config)
 void CFEASolver::FilterElementDensities(CGeometry *geometry, const CConfig *config)
 {
     // make a shell
-    for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
-      if (geometry->nodes->GetPhysicalBoundary(iPoint))// &&
-          //geometry->nodes->GetCoord(iPoint,1) > 0.001)
+    if (false) for (auto iPoint=0ul; iPoint<nPointDomain; ++iPoint)
+      if (geometry->nodes->GetPhysicalBoundary(iPoint) &&
+          geometry->nodes->GetCoord(iPoint,1) > 0.001)
         for (auto iElem : geometry->nodes->GetElems(iPoint))
-          element_properties[iElem]->SetDesignDensity(0.562);
+          element_properties[iElem]->SetDesignDensity(0.464);
 
     // freeze small elements
-    for (auto iElem=0ul; iElem<nElement; ++iElem) {
+    if (false) for (auto iElem=0ul; iElem<nElement; ++iElem) {
       if (geometry->elem[iElem]->GetVolume() < 2.0e-9)
-        element_properties[iElem]->SetDesignDensity(0.562);
+        element_properties[iElem]->SetDesignDensity(0.464);
     }
 
   /*--- Apply a filter to the design densities of the elements to generate the
