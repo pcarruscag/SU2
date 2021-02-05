@@ -225,7 +225,7 @@ void CGeometry::PreprocessP2PComms(CGeometry *geometry,
    many cells it will receive from each other processor. ---*/
 
   SU2_MPI::Alltoall(&(nPoint_Send_All[1]), 1, MPI_INT,
-                    &(nPoint_Recv_All[1]), 1, MPI_INT, MPI_COMM_WORLD);
+                    &(nPoint_Recv_All[1]), 1, MPI_INT, SU2_MPI::GetComm());
 
   /*--- Prepare to send connectivities. First check how many
    messages we will be sending and receiving. Here we also put
@@ -453,11 +453,11 @@ void CGeometry::PostP2PRecvs(CGeometry *geometry,
       switch (commType) {
         case COMM_TYPE_DOUBLE:
           SU2_MPI::Irecv(&(bufD_P2PSend[offset]), count, MPI_DOUBLE,
-                         source, tag, MPI_COMM_WORLD, &(req_P2PRecv[iRecv]));
+                         source, tag, SU2_MPI::GetComm(), &(req_P2PRecv[iRecv]));
           break;
         case COMM_TYPE_UNSIGNED_SHORT:
           SU2_MPI::Irecv(&(bufS_P2PSend[offset]), count, MPI_UNSIGNED_SHORT,
-                         source, tag, MPI_COMM_WORLD, &(req_P2PRecv[iRecv]));
+                         source, tag, SU2_MPI::GetComm(), &(req_P2PRecv[iRecv]));
           break;
         default:
           SU2_MPI::Error("Unrecognized data type for point-to-point MPI comms.",
@@ -490,11 +490,11 @@ void CGeometry::PostP2PRecvs(CGeometry *geometry,
       switch (commType) {
         case COMM_TYPE_DOUBLE:
           SU2_MPI::Irecv(&(bufD_P2PRecv[offset]), count, MPI_DOUBLE,
-                         source, tag, MPI_COMM_WORLD, &(req_P2PRecv[iMessage]));
+                         source, tag, SU2_MPI::GetComm(), &(req_P2PRecv[iMessage]));
           break;
         case COMM_TYPE_UNSIGNED_SHORT:
           SU2_MPI::Irecv(&(bufS_P2PRecv[offset]), count, MPI_UNSIGNED_SHORT,
-                         source, tag, MPI_COMM_WORLD, &(req_P2PRecv[iMessage]));
+                         source, tag, SU2_MPI::GetComm(), &(req_P2PRecv[iMessage]));
           break;
         default:
           SU2_MPI::Error("Unrecognized data type for point-to-point MPI comms.",
@@ -552,11 +552,11 @@ void CGeometry::PostP2PSends(CGeometry *geometry,
     switch (commType) {
       case COMM_TYPE_DOUBLE:
         SU2_MPI::Isend(&(bufD_P2PRecv[offset]), count, MPI_DOUBLE,
-                       dest, tag, MPI_COMM_WORLD, &(req_P2PSend[val_iSend]));
+                       dest, tag, SU2_MPI::GetComm(), &(req_P2PSend[val_iSend]));
         break;
       case COMM_TYPE_UNSIGNED_SHORT:
         SU2_MPI::Isend(&(bufS_P2PRecv[offset]), count, MPI_UNSIGNED_SHORT,
-                       dest, tag, MPI_COMM_WORLD, &(req_P2PSend[val_iSend]));
+                       dest, tag, SU2_MPI::GetComm(), &(req_P2PSend[val_iSend]));
         break;
       default:
         SU2_MPI::Error("Unrecognized data type for point-to-point MPI comms.",
@@ -589,11 +589,11 @@ void CGeometry::PostP2PSends(CGeometry *geometry,
     switch (commType) {
       case COMM_TYPE_DOUBLE:
         SU2_MPI::Isend(&(bufD_P2PSend[offset]), count, MPI_DOUBLE,
-                       dest, tag, MPI_COMM_WORLD, &(req_P2PSend[val_iSend]));
+                       dest, tag, SU2_MPI::GetComm(), &(req_P2PSend[val_iSend]));
         break;
       case COMM_TYPE_UNSIGNED_SHORT:
         SU2_MPI::Isend(&(bufS_P2PSend[offset]), count, MPI_UNSIGNED_SHORT,
-                       dest, tag, MPI_COMM_WORLD, &(req_P2PSend[val_iSend]));
+                       dest, tag, SU2_MPI::GetComm(), &(req_P2PSend[val_iSend]));
         break;
       default:
         SU2_MPI::Error("Unrecognized data type for point-to-point MPI comms.",
@@ -928,7 +928,7 @@ void CGeometry::PreprocessPeriodicComms(CGeometry *geometry,
    many periodic points it will receive from each other processor. ---*/
 
   SU2_MPI::Alltoall(&(nPoint_Send_All[1]), 1, MPI_INT,
-                    &(nPoint_Recv_All[1]), 1, MPI_INT, MPI_COMM_WORLD);
+                    &(nPoint_Recv_All[1]), 1, MPI_INT, SU2_MPI::GetComm());
 
   /*--- Check how many messages we will be sending and receiving.
    Here we also put the counters into cumulative storage format to
@@ -1113,7 +1113,7 @@ void CGeometry::PreprocessPeriodicComms(CGeometry *geometry,
     /*--- Post non-blocking recv for this proc. ---*/
 
     SU2_MPI::Irecv(&(static_cast<unsigned long*>(idRecv)[offset]),
-                   count, MPI_UNSIGNED_LONG, source, tag, MPI_COMM_WORLD,
+                   count, MPI_UNSIGNED_LONG, source, tag, SU2_MPI::GetComm(),
                    &(req_PeriodicRecv[iMessage]));
 
     /*--- Increment message counter. ---*/
@@ -1144,7 +1144,7 @@ void CGeometry::PreprocessPeriodicComms(CGeometry *geometry,
     /*--- Post non-blocking send for this proc. ---*/
 
     SU2_MPI::Isend(&(static_cast<unsigned long*>(idSend)[offset]),
-                   count, MPI_UNSIGNED_LONG, dest, tag, MPI_COMM_WORLD,
+                   count, MPI_UNSIGNED_LONG, dest, tag, SU2_MPI::GetComm(),
                    &(req_PeriodicSend[iMessage]));
 
     /*--- Increment message counter. ---*/
@@ -1269,12 +1269,12 @@ void CGeometry::PostPeriodicRecvs(CGeometry *geometry,
     switch (commType) {
       case COMM_TYPE_DOUBLE:
         SU2_MPI::Irecv(&(static_cast<su2double*>(bufD_PeriodicRecv)[offset]),
-                       count, MPI_DOUBLE, source, tag, MPI_COMM_WORLD,
+                       count, MPI_DOUBLE, source, tag, SU2_MPI::GetComm(),
                        &(req_PeriodicRecv[iRecv]));
         break;
       case COMM_TYPE_UNSIGNED_SHORT:
         SU2_MPI::Irecv(&(static_cast<unsigned short*>(bufS_PeriodicRecv)[offset]),
-                       count, MPI_UNSIGNED_SHORT, source, tag, MPI_COMM_WORLD,
+                       count, MPI_UNSIGNED_SHORT, source, tag, SU2_MPI::GetComm(),
                        &(req_PeriodicRecv[iRecv]));
         break;
       default:
@@ -1325,12 +1325,12 @@ void CGeometry::PostPeriodicSends(CGeometry *geometry,
   switch (commType) {
     case COMM_TYPE_DOUBLE:
       SU2_MPI::Isend(&(static_cast<su2double*>(bufD_PeriodicSend)[offset]),
-                     count, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD,
+                     count, MPI_DOUBLE, dest, tag, SU2_MPI::GetComm(),
                      &(req_PeriodicSend[val_iSend]));
       break;
     case COMM_TYPE_UNSIGNED_SHORT:
       SU2_MPI::Isend(&(static_cast<unsigned short*>(bufS_PeriodicSend)[offset]),
-                     count, MPI_UNSIGNED_SHORT, dest, tag, MPI_COMM_WORLD,
+                     count, MPI_UNSIGNED_SHORT, dest, tag, SU2_MPI::GetComm(),
                      &(req_PeriodicSend[val_iSend]));
       break;
     default:
@@ -1992,8 +1992,8 @@ void CGeometry::ComputeAirfoil_Section(su2double *Plane_P0, su2double *Plane_Nor
 
   Buffer_Send_nEdge[0] = nLocalEdge;
 
-  SU2_MPI::Allreduce(&nLocalEdge, &MaxLocalEdge, 1, MPI_UNSIGNED_LONG, MPI_MAX, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_nEdge, 1, MPI_UNSIGNED_LONG, Buffer_Receive_nEdge, 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+  SU2_MPI::Allreduce(&nLocalEdge, &MaxLocalEdge, 1, MPI_UNSIGNED_LONG, MPI_MAX, SU2_MPI::GetComm());
+  SU2_MPI::Allgather(Buffer_Send_nEdge, 1, MPI_UNSIGNED_LONG, Buffer_Receive_nEdge, 1, MPI_UNSIGNED_LONG, SU2_MPI::GetComm());
 
   Buffer_Send_Coord    = new su2double [MaxLocalEdge*6];
   Buffer_Receive_Coord = new su2double [nProcessor*MaxLocalEdge*6];
@@ -2025,9 +2025,9 @@ void CGeometry::ComputeAirfoil_Section(su2double *Plane_P0, su2double *Plane_Nor
     Buffer_Send_GlobalID[iEdge*4 + 3] = JGlobalID_Index1[iEdge];
   }
 
-  SU2_MPI::Allgather(Buffer_Send_Coord, nBuffer_Coord, MPI_DOUBLE, Buffer_Receive_Coord, nBuffer_Coord, MPI_DOUBLE, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_Variable, nBuffer_Variable, MPI_DOUBLE, Buffer_Receive_Variable, nBuffer_Variable, MPI_DOUBLE, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_GlobalID, nBuffer_GlobalID, MPI_UNSIGNED_LONG, Buffer_Receive_GlobalID, nBuffer_GlobalID, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+  SU2_MPI::Allgather(Buffer_Send_Coord, nBuffer_Coord, MPI_DOUBLE, Buffer_Receive_Coord, nBuffer_Coord, MPI_DOUBLE, SU2_MPI::GetComm());
+  SU2_MPI::Allgather(Buffer_Send_Variable, nBuffer_Variable, MPI_DOUBLE, Buffer_Receive_Variable, nBuffer_Variable, MPI_DOUBLE, SU2_MPI::GetComm());
+  SU2_MPI::Allgather(Buffer_Send_GlobalID, nBuffer_GlobalID, MPI_UNSIGNED_LONG, Buffer_Receive_GlobalID, nBuffer_GlobalID, MPI_UNSIGNED_LONG, SU2_MPI::GetComm());
 
   /*--- Clean the vectors before adding the new vertices only to the master node ---*/
 
@@ -2729,7 +2729,7 @@ void CGeometry::ComputeSurf_Straightness(CConfig *config,
 
     /*--- Product of type <int>(bool) is equivalnt to a 'logical and' ---*/
     SU2_MPI::Allreduce(Buff_Send_isStraight.data(), Buff_Recv_isStraight.data(),
-                       nMarker_Global, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
+                       nMarker_Global, MPI_INT, MPI_PROD, SU2_MPI::GetComm());
 
     /*--- Print results on screen. ---*/
     if(rank == MASTER_NODE) {
@@ -2997,9 +2997,9 @@ void CGeometry::ComputeSurf_Curvature(CConfig *config) {
   su2double MyMeanK = MeanK; MeanK = 0.0;
   su2double MyMaxK = MaxK; MaxK = 0.0;
   unsigned long MynPointDomain = TotalnPointDomain; TotalnPointDomain = 0;
-  SU2_MPI::Allreduce(&MyMeanK, &MeanK, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(&MyMaxK, &MaxK, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-  SU2_MPI::Allreduce(&MynPointDomain, &TotalnPointDomain, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+  SU2_MPI::Allreduce(&MyMeanK, &MeanK, 1, MPI_DOUBLE, MPI_SUM, SU2_MPI::GetComm());
+  SU2_MPI::Allreduce(&MyMaxK, &MaxK, 1, MPI_DOUBLE, MPI_MAX, SU2_MPI::GetComm());
+  SU2_MPI::Allreduce(&MynPointDomain, &TotalnPointDomain, 1, MPI_UNSIGNED_LONG, MPI_SUM, SU2_MPI::GetComm());
 
   /*--- Compute the mean ---*/
   MeanK /= su2double(TotalnPointDomain);
@@ -3018,7 +3018,7 @@ void CGeometry::ComputeSurf_Curvature(CConfig *config) {
   }
 
   su2double MySigmaK = SigmaK; SigmaK = 0.0;
-  SU2_MPI::Allreduce(&MySigmaK, &SigmaK, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  SU2_MPI::Allreduce(&MySigmaK, &SigmaK, 1, MPI_DOUBLE, MPI_SUM, SU2_MPI::GetComm());
 
   SigmaK = sqrt(SigmaK/su2double(TotalnPointDomain));
 
@@ -3053,8 +3053,8 @@ void CGeometry::ComputeSurf_Curvature(CConfig *config) {
   /*--- Communicate to all processors the total number of critical edge nodes. ---*/
 
   MaxLocalVertex = 0;
-  SU2_MPI::Allreduce(&nLocalVertex, &MaxLocalVertex, 1, MPI_UNSIGNED_LONG, MPI_MAX, MPI_COMM_WORLD);
-  SU2_MPI::Allgather(Buffer_Send_nVertex, 1, MPI_UNSIGNED_LONG, Buffer_Receive_nVertex, 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+  SU2_MPI::Allreduce(&nLocalVertex, &MaxLocalVertex, 1, MPI_UNSIGNED_LONG, MPI_MAX, SU2_MPI::GetComm());
+  SU2_MPI::Allgather(Buffer_Send_nVertex, 1, MPI_UNSIGNED_LONG, Buffer_Receive_nVertex, 1, MPI_UNSIGNED_LONG, SU2_MPI::GetComm());
 
   /*--- Create and initialize to zero some buffers to hold the coordinates
    of the boundary nodes that are communicated from each partition (all-to-all). ---*/
@@ -3072,7 +3072,7 @@ void CGeometry::ComputeSurf_Curvature(CConfig *config) {
       Buffer_Send_Coord[iVertex*nDim+iDim] = nodes->GetCoord(iPoint, iDim);
   }
 
-  SU2_MPI::Allgather(Buffer_Send_Coord, nBuffer, MPI_DOUBLE, Buffer_Receive_Coord, nBuffer, MPI_DOUBLE, MPI_COMM_WORLD);
+  SU2_MPI::Allgather(Buffer_Send_Coord, nBuffer, MPI_DOUBLE, Buffer_Receive_Coord, nBuffer, MPI_DOUBLE, SU2_MPI::GetComm());
 
   /*--- Loop over all interior mesh nodes on the local partition and compute
    the distances to each of the no-slip boundary nodes in the entire mesh.
@@ -3134,7 +3134,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
 
   vector<unsigned long> counts(size), displs(size,0);
   auto nE = nElem;
-  SU2_MPI::Allgather(&nE, 1, MPI_UNSIGNED_LONG, counts.data(), 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+  SU2_MPI::Allgather(&nE, 1, MPI_UNSIGNED_LONG, counts.data(), 1, MPI_UNSIGNED_LONG, SU2_MPI::GetComm());
   for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
   const auto nElemGlobal = displs.back() + counts.back();
 
@@ -3158,9 +3158,9 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
 
     for (int p=0; p<size; ++p) {
       if (p == MASTER_NODE) continue;
-      SU2_MPI::Recv(cg_elem[displs[p]], counts[p]*nDim, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      SU2_MPI::Recv(&vol_elem[displs[p]], counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      SU2_MPI::Recv(&work_elem[displs[p]], counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      SU2_MPI::Recv(cg_elem[displs[p]], counts[p]*nDim, MPI_DOUBLE, p, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
+      SU2_MPI::Recv(&vol_elem[displs[p]], counts[p], MPI_DOUBLE, p, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
+      SU2_MPI::Recv(&work_elem[displs[p]], counts[p], MPI_DOUBLE, p, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
     }
   }
   else {
@@ -3174,9 +3174,9 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
       vol_elem[iElem] = elem[iElem]->GetVolume();
     }
 
-    SU2_MPI::Send(cg_elem.data(), nElem*nDim, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
-    SU2_MPI::Send(vol_elem.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
-    SU2_MPI::Send(values.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
+    SU2_MPI::Send(cg_elem.data(), nElem*nDim, MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm());
+    SU2_MPI::Send(vol_elem.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm());
+    SU2_MPI::Send(values.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm());
   }
 
   /*--- Master node re-orders data by global index and sends it to other active nodes. ---*/
@@ -3200,9 +3200,9 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
 
     for (int p=0; p<size; p+=mpi_stride) {
       if (p == MASTER_NODE) continue;
-      SU2_MPI::Send(cg_elem.data(), cg_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
-      SU2_MPI::Send(vol_elem.data(), vol_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
-      SU2_MPI::Send(work_elem.data(), work_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+      SU2_MPI::Send(cg_elem.data(), cg_elem.size(), MPI_DOUBLE, p, 0, SU2_MPI::GetComm());
+      SU2_MPI::Send(vol_elem.data(), vol_elem.size(), MPI_DOUBLE, p, 0, SU2_MPI::GetComm());
+      SU2_MPI::Send(work_elem.data(), work_elem.size(), MPI_DOUBLE, p, 0, SU2_MPI::GetComm());
     }
   }
   else if (rank % mpi_stride == 0) {
@@ -3210,9 +3210,9 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
     vol_elem.resize(Global_nElemDomain);
     work_elem.resize(Global_nElemDomain);
 
-    SU2_MPI::Recv(cg_elem.data(), cg_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    SU2_MPI::Recv(vol_elem.data(), vol_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    SU2_MPI::Recv(work_elem.data(), work_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(cg_elem.data(), cg_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(vol_elem.data(), vol_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(work_elem.data(), work_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
   }
 
   /*--- Counter for the total number of searches for which the recursion
@@ -3312,7 +3312,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
       /*--- Gather result on master rank. ---*/
       if (rank != MASTER_NODE) {
         /*--- Send to master. ---*/
-        SU2_MPI::Send(work_loc.data(), work_loc.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD);
+        SU2_MPI::Send(work_loc.data(), work_loc.size(), MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm());
       }
       else {
         for (size_t i=0, begin=rank/mpi_stride*chunk; i<work_loc.size(); ++i)
@@ -3323,7 +3323,7 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
           if (p == MASTER_NODE) continue;
           const auto begin = p / mpi_stride * chunk;
           const auto end = min(begin + chunk, Global_nElemDomain);
-          SU2_MPI::Recv(&work_elem[begin], end-begin, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+          SU2_MPI::Recv(&work_elem[begin], end-begin, MPI_DOUBLE, p, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
         }
       }
 
@@ -3332,11 +3332,11 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
         if (rank == MASTER_NODE) {
           for (int p=0; p<size; p+=mpi_stride) {
             if (p == MASTER_NODE) continue;
-            SU2_MPI::Send(work_elem.data(), work_elem.size(), MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+            SU2_MPI::Send(work_elem.data(), work_elem.size(), MPI_DOUBLE, p, 0, SU2_MPI::GetComm());
           }
         }
         else {
-          SU2_MPI::Recv(work_elem.data(), work_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+          SU2_MPI::Recv(work_elem.data(), work_elem.size(), MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
         }
       }
     }
@@ -3356,17 +3356,17 @@ void CGeometry::FilterValuesAtElementCG(const unsigned short mpi_stride,
       if (p == MASTER_NODE) continue;
       for (auto i = 0ul; i < counts[p]; ++i)
         work_loc[i] = work_elem[global_index[displs[p]+i]];
-      SU2_MPI::Send(work_loc.data(), counts[p], MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
+      SU2_MPI::Send(work_loc.data(), counts[p], MPI_DOUBLE, p, 0, SU2_MPI::GetComm());
     }
   }
   else {
-    SU2_MPI::Recv(values.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(values.data(), nElem, MPI_DOUBLE, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
   }
 
   limited_searches /= kernels.size();
 
   unsigned long t = limited_searches;
-  SU2_MPI::Reduce(&t,&limited_searches,1,MPI_UNSIGNED_LONG,MPI_SUM,MASTER_NODE,MPI_COMM_WORLD);
+  SU2_MPI::Reduce(&t,&limited_searches,1,MPI_UNSIGNED_LONG,MPI_SUM,MASTER_NODE,SU2_MPI::GetComm());
 
   if (rank==MASTER_NODE && limited_searches>0)
     cout << "Warning: The filter radius was limited for " << limited_searches
@@ -3399,7 +3399,7 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
   }
 
   unsigned long nElemGlobal = 0, nE = nElem;
-  SU2_MPI::Allreduce(&nE, &nElemGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+  SU2_MPI::Allreduce(&nE, &nElemGlobal, 1, MPI_UNSIGNED_LONG, MPI_SUM, SU2_MPI::GetComm());
 
   vector<unsigned short> nFaces_elem(nElemGlobal * (rank==MASTER_NODE));
   global_index.resize(nElemGlobal * (rank==MASTER_NODE));
@@ -3407,22 +3407,22 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
 #ifdef HAVE_MPI
   vector<int> counts(size), displs(size,0);
   int tmp = nElem;
-  MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, SU2_MPI::GetComm());
   for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
 
   MPI_Gatherv(nFaces.data(), nElem, MPI_UNSIGNED_SHORT, nFaces_elem.data(), counts.data(),
-              displs.data(), MPI_UNSIGNED_SHORT, MASTER_NODE, MPI_COMM_WORLD);
+              displs.data(), MPI_UNSIGNED_SHORT, MASTER_NODE, SU2_MPI::GetComm());
   MPI_Gatherv(glblIndex.data(), nElem, MPI_UNSIGNED_LONG, global_index.data(), counts.data(),
-              displs.data(), MPI_UNSIGNED_LONG, MASTER_NODE, MPI_COMM_WORLD);
+              displs.data(), MPI_UNSIGNED_LONG, MASTER_NODE, SU2_MPI::GetComm());
 
   tmp = connect.size();
-  MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgather(&tmp, 1, MPI_INT, counts.data(), 1, MPI_INT, SU2_MPI::GetComm());
   for (int i=1; i<size; ++i) displs[i] = displs[i-1] + counts[i-1];
 
   vector<long> connectivity((displs.back()+counts.back()) * (rank==MASTER_NODE));
 
   MPI_Gatherv(connect.data(), tmp, MPI_LONG, connectivity.data(), counts.data(),
-              displs.data(), MPI_LONG, MASTER_NODE, MPI_COMM_WORLD);
+              displs.data(), MPI_LONG, MASTER_NODE, SU2_MPI::GetComm());
 #else
   nFaces_elem = move(nFaces);
   global_index = move(glblIndex);
@@ -3462,15 +3462,15 @@ void CGeometry::GetGlobalElementAdjacencyMatrix(const unsigned short mpi_stride,
 
     for (int p=0; p<size; p+=mpi_stride) {
       if (p == MASTER_NODE) continue;
-      SU2_MPI::Send(neighbour_start.data(), Global_nElemDomain+1, MPI_UNSIGNED_LONG, p, 0, MPI_COMM_WORLD);
-      SU2_MPI::Send(neighbour_idx.data(), neighbour_start.back(), MPI_LONG, p, 0, MPI_COMM_WORLD);
+      SU2_MPI::Send(neighbour_start.data(), Global_nElemDomain+1, MPI_UNSIGNED_LONG, p, 0, SU2_MPI::GetComm());
+      SU2_MPI::Send(neighbour_idx.data(), neighbour_start.back(), MPI_LONG, p, 0, SU2_MPI::GetComm());
     }
   }
   else if (rank % mpi_stride == 0) {
     neighbour_start.resize(Global_nElemDomain+1);
-    SU2_MPI::Recv(neighbour_start.data(), Global_nElemDomain+1, MPI_UNSIGNED_LONG, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(neighbour_start.data(), Global_nElemDomain+1, MPI_UNSIGNED_LONG, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
     neighbour_idx.resize(neighbour_start.back());
-    SU2_MPI::Recv(neighbour_idx.data(), neighbour_start.back(), MPI_LONG, MASTER_NODE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    SU2_MPI::Recv(neighbour_idx.data(), neighbour_start.back(), MPI_LONG, MASTER_NODE, 0, SU2_MPI::GetComm(), MPI_STATUS_IGNORE);
   }
 }
 
