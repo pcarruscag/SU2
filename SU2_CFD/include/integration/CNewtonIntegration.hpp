@@ -28,6 +28,7 @@
 #include "CIntegration.hpp"
 #include "../../../Common/include/parallelization/omp_structure.hpp"
 #include "../../../Common/include/linear_algebra/CPreconditioner.hpp"
+#include "../../../Common/include/linear_algebra/CMatrixVectorProduct.hpp"
 #include "../../../Common/include/linear_algebra/CSysSolve.hpp"
 
 #ifdef HAVE_OMP
@@ -106,7 +107,7 @@ private:
     CNEWTON_PARFOR
     for (auto i = 0ul; i < u.GetLocSize(); ++i) precondIn[i] = u[i];
 
-    (*preconditioner)(precondIn, precondOut);
+    Preconditioner_impl(precondIn, precondOut);
 
     CNEWTON_PARFOR
     for (auto i = 0ul; i < u.GetLocSize(); ++i) v[i] = precondOut[i];
@@ -115,7 +116,16 @@ private:
 
   /*--- Otherwise they are not needed. ---*/
   template<class T, su2enable_if<std::is_same<T,MixedScalar>::value> = 0>
-  inline void Preconditioner_impl(const CSysVector<T>& u, CSysVector<T>& v) const { (*preconditioner)(u, v); }
+  inline void Preconditioner_impl(const CSysVector<T>& u, CSysVector<T>& v) const {
+
+//    (*preconditioner)(u, v);
+
+    MixedScalar eps = SU2_TYPE::GetValue(config->GetLinear_Solver_Error());
+    auto iter = config->GetLinear_Solver_Iter();
+    auto product = CSysMatrixVectorProduct<MixedScalar>(solvers[FLOW_SOL]->Jacobian, geometry, config);
+    v = MixedScalar(0.0);
+    solvers[FLOW_SOL]->System.FGMRES_LinSolver(u, v, product, *preconditioner, eps, iter, eps, false, config, true);
+  }
 
   /*!
    * \brief Gather solver info, etc..
