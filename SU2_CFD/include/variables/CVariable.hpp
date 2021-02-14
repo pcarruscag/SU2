@@ -288,29 +288,12 @@ public:
   }
 
   /*!
-   * \brief Set to zero the velocity components of the solution.
-   * \param[in] iPoint - Point index.
-   */
-  inline void SetVelSolutionZero(unsigned long iPoint) {
-    for (unsigned long iDim = 0; iDim < nDim; iDim++) Solution(iPoint,iDim+1) = 0.0;
-  }
-
-  /*!
-   * \brief Specify a vector to set the velocity components of the solution.
+   * \brief Virtual Member. Specify a vector to set the velocity components of the solution.
+   *        Multiplied by density for compressible cases.
    * \param[in] iPoint - Point index.
    * \param[in] val_vector - Pointer to the vector.
    */
-  inline void SetVelSolutionVector(unsigned long iPoint, const su2double *val_vector) {
-    for (unsigned long iDim = 0; iDim < nDim; iDim++) Solution(iPoint, iDim+1) = val_vector[iDim];
-  }
-
-  /*!
-   * \brief Set to zero velocity components of the solution.
-   * \param[in] iPoint - Point index.
-   */
-  inline void SetVelSolutionOldZero(unsigned long iPoint) {
-    for (unsigned long iDim = 0; iDim < nDim; iDim++) Solution_Old(iPoint, iDim+1) = 0.0;
-  }
+  inline virtual void SetVelSolutionVector(unsigned long iPoint, const su2double *val_vector) { }
 
   /*!
    * \brief Add a value to the solution.
@@ -469,6 +452,7 @@ public:
    * \return Pointer to the External row for iPoint.
    */
   inline const su2double *Get_External(unsigned long iPoint) const { return External[iPoint]; }
+  inline const MatrixType& Get_External() const { return External; }
 
   /*!
    * \brief Get the solution at time n.
@@ -510,12 +494,6 @@ public:
   inline void SetResidualSumZero(unsigned long iPoint) {
     for (unsigned long iVar = 0; iVar < nVar; iVar++) Residual_Sum(iPoint,iVar) = 0.0;
   }
-
-  /*!
-   * \brief Set the velocity of the truncation error to zero.
-   * \param[in] iPoint - Point index.
-   */
-  inline virtual void SetVel_ResTruncError_Zero(unsigned long iPoint, unsigned long iSpecies) {}
 
   /*!
    * \brief Get the value of the summed residual.
@@ -662,12 +640,10 @@ public:
   inline void SetVal_ResTruncError_Zero(unsigned long iPoint, unsigned long iVar) {Res_TruncError(iPoint, iVar) = 0.0;}
 
   /*!
-   * \brief Set the velocity of the truncation error to zero.
+   * \brief Set the momentum part of the truncation error to zero.
    * \param[in] iPoint - Point index.
    */
-  inline void SetVel_ResTruncError_Zero(unsigned long iPoint) {
-    for (unsigned long iDim = 0; iDim < nDim; iDim++) Res_TruncError(iPoint,iDim+1) = 0.0;
-  }
+  inline virtual void SetVel_ResTruncError_Zero(unsigned long iPoint) { }
 
   /*!
    * \brief Set the velocity of the truncation error to zero.

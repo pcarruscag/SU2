@@ -114,6 +114,9 @@ void CFVMFlowSolverBase<V, R>::Allocate(const CConfig& config) {
   LinSysSol.Initialize(nPoint, nPointDomain, nVar, 0.0);
   LinSysRes.Initialize(nPoint, nPointDomain, nVar, 0.0);
 
+  /*--- LinSysSol will always be init to 0. ---*/
+  System.SetxIsZero(true);
+
   /*--- Allocates a 2D array with variable "outer" sizes and init to 0. ---*/
 
   auto Alloc2D = [](unsigned long M, const unsigned long* N, su2double**& X) {
@@ -1540,7 +1543,10 @@ void CFVMFlowSolverBase<V, FlowRegime>::BC_Fluid_Interface(CGeometry* geometry, 
               /*--- Set the normal vector and the coordinates ---*/
 
               visc_numerics->SetNormal(Normal);
-              visc_numerics->SetCoord(geometry->nodes->GetCoord(iPoint), geometry->nodes->GetCoord(Point_Normal));
+              su2double Coord_Reflected[MAXNDIM];
+              GeometryToolbox::PointPointReflect(nDim, geometry->nodes->GetCoord(Point_Normal),
+                                                        geometry->nodes->GetCoord(iPoint), Coord_Reflected);
+              visc_numerics->SetCoord(geometry->nodes->GetCoord(iPoint), Coord_Reflected);
 
               /*--- Primitive variables, and gradient ---*/
 

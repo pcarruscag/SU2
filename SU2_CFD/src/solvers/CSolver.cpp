@@ -2080,7 +2080,7 @@ void CSolver::AdaptCFLNumber(CGeometry **geometry,
           signChanges += (prev > 0) ^ (val > 0);
           prev = val;
         }
-        reduceCFL |= (signChanges > Res_Count/4) && (totalChange > -0.5) && !config->GetNewtonKrylov();
+        reduceCFL |= (signChanges > Res_Count/4) && (totalChange > -0.5);
 
         if (totalChange > 2.0) { // orders of magnitude
           resetCFL = true;
@@ -2456,8 +2456,8 @@ void CSolver::SetRotatingFrame_GCL(CGeometry *geometry, const CConfig *config) {
 
 void CSolver::SetAuxVar_Gradient_GG(CGeometry *geometry, const CConfig *config) {
 
-  const auto solution = base_nodes->GetAuxVar();
-  auto gradient = base_nodes->GetAuxVarGradient();
+  const auto& solution = base_nodes->GetAuxVar();
+  auto& gradient = base_nodes->GetAuxVarGradient();
 
   computeGradientsGreenGauss(this, AUXVAR_GRADIENT, PERIODIC_NONE, *geometry,
                              *config, solution, 0, base_nodes->GetnAuxVar(), gradient);
@@ -2466,8 +2466,8 @@ void CSolver::SetAuxVar_Gradient_GG(CGeometry *geometry, const CConfig *config) 
 void CSolver::SetAuxVar_Gradient_LS(CGeometry *geometry, const CConfig *config) {
 
   bool weighted = true;
-  const auto solution = base_nodes->GetAuxVar();
-  auto gradient = base_nodes->GetAuxVarGradient();
+  const auto& solution = base_nodes->GetAuxVar();
+  auto& gradient = base_nodes->GetAuxVarGradient();
   auto& rmatrix  = base_nodes->GetRmatrix();
 
   computeGradientsLeastSquares(this, AUXVAR_GRADIENT, PERIODIC_NONE, *geometry, *config,
