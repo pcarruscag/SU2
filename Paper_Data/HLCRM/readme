@@ -1,0 +1,4 @@
+SU2 was compiled with single precision linear algebra for this example.
+This example was run with 640 cores, the relaxation factor for ILU smoothing may have to be adjusted when deviating from this.
+There are two configuration files provided for the primal, the first is to ramp the CFL, then the second config (with fixed CFL) should be used.
+

@@ -1,0 +1,4 @@
+SU2 was compiled with single precision linear algebra for this example.
+This example was run with 4 cores, the relaxation factor for ILU smoothing may have to be adjusted when deviating from this.
+Initializing the transposed systems requires commenting out line 61 of CSysSolve_b.cpp (warning: do use this change "in production", the adjoints are correct, but derivatives will not be accurate due to the Px Palpha consistency issue mentioned in the paper).
+
